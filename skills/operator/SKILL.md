@@ -28,9 +28,9 @@ Inside Hermes sessions:
 /relay status
 /relay shadow-report
 /relay doctor
-/relay cutover-status
-/relay cutover-switch --owner relay --instance-id relay-operator-1
-/relay cutover-switch --owner legacy-watchdog --instance-id relay-operator-1
+/relay active-gate-status
+/relay set-active-execution --enabled true
+/relay set-active-execution --enabled false
 /relay service-install
 /relay service-install --service-mode active
 /relay service-status
@@ -58,7 +58,7 @@ Inside Hermes sessions:
 - `service-install` resolves profile defaults automatically:
   - shadow: `yoyopod-relay-shadow.service` + `relay-shadow-service-1` + `run-shadow`
   - active: `yoyopod-relay-active.service` + `relay-active-service-1` + `run-active`
-- `run-shadow` remains shadow-only: it derives and records actions but does not execute ownership side effects.
-- `iterate-active` / `run-active` are guarded: they will only execute actions when Relay is marked as the desired primary owner, active execution is enabled, the runtime is in `active` mode, the legacy watchdog is disabled, and current Relay-vs-legacy parity is still compatible.
-- `cutover-switch --owner relay` coordinates the wrapper-side pause plus Relay ownership arming; pair it with the supervised active service when you want a real executor instead of manual active runs. `cutover-switch --owner legacy-watchdog` disarms Relay active execution and resumes the legacy wrapper jobs.
+- `run-shadow` remains shadow-only: it derives and records actions but does not execute active side effects.
+- `iterate-active` / `run-active` are guarded: they will only execute actions when Relay active execution is enabled, the runtime is in `active` mode, and current Relay-vs-wrapper parity is still compatible.
+- `set-active-execution --enabled true|false` toggles the guarded executor directly. Pair it with the supervised active service when you want a real executor instead of manual active runs.
 - The plugin also registers a CLI command tree for future compatibility, but the reliable operator surface in the current Hermes build is the slash command.
