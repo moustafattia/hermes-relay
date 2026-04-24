@@ -218,3 +218,43 @@ def test_run_cli_raises_on_schema_validation_error(tmp_path, monkeypatch):
     import jsonschema
     with pytest.raises(jsonschema.ValidationError):
         workflows.run_cli(workspace_root, [])
+
+
+def test_main_parses_workflow_root_flag_and_invokes_run_cli(tmp_path, monkeypatch, capsys):
+    _write_stub_workflow(tmp_path, name="demo-wf")
+    workspace_root = tmp_path / "workspace"
+    (workspace_root / "config").mkdir(parents=True)
+    (workspace_root / "config" / "workflow.yaml").write_text(
+        "workflow: demo-wf\nschema-version: 1\n",
+        encoding="utf-8",
+    )
+    _reset_workflows_module_cache()
+    workflows = importlib.import_module("workflows")
+    monkeypatch.setattr(workflows, "__path__", list(workflows.__path__) + [str(tmp_path / "workflows")])
+
+    workflows_main = importlib.import_module("workflows.__main__")
+    code = workflows_main.main([
+        "--workflow-root", str(workspace_root),
+        "status", "--json",
+    ])
+    assert code == 0
+    out = capsys.readouterr().out
+    assert "ran demo-wf with argv=['status', '--json']" in out
+
+
+def test_main_uses_env_fallback_when_no_workflow_root_flag(tmp_path, monkeypatch, capsys):
+    _write_stub_workflow(tmp_path, name="demo-wf")
+    workspace_root = tmp_path / "workspace"
+    (workspace_root / "config").mkdir(parents=True)
+    (workspace_root / "config" / "workflow.yaml").write_text(
+        "workflow: demo-wf\nschema-version: 1\n",
+        encoding="utf-8",
+    )
+    _reset_workflows_module_cache()
+    monkeypatch.setenv("YOYOPOD_WORKFLOW_ROOT", str(workspace_root))
+    workflows = importlib.import_module("workflows")
+    monkeypatch.setattr(workflows, "__path__", list(workflows.__path__) + [str(tmp_path / "workflows")])
+
+    workflows_main = importlib.import_module("workflows.__main__")
+    code = workflows_main.main(["tick"])
+    assert code == 0
