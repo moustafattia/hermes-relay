@@ -84,7 +84,7 @@ It should own:
 - runtime db/event-log path resolution
 - alert-state path resolution
 - project-data-root discovery
-- plugin-entrypoint path lookup (the canonical workflow CLI at `<workflow_root>/.hermes/plugins/hermes-relay/adapters/yoyopod_core/__main__.py`; the earlier `scripts/yoyopod_workflow.py` wrapper has been retired)
+- plugin-entrypoint path lookup (the canonical workflow CLI at `<workflow_root>/.hermes/plugins/hermes-relay/workflows/__main__.py --workflow-root /home/radxa/.hermes/workflows/yoyopod`; the earlier `scripts/yoyopod_workflow.py` wrapper has been retired)
 - runtime-layout fallback rules: if `runtime/` exists under the workflow root, store mutable state under `runtime/{memory,state,logs}`; otherwise fall back to the legacy top-level `memory/` and `state/` layout
 
 Recommended default workflow-root resolution order learned from the migration slice:
@@ -174,7 +174,7 @@ Once `status.py` exists, `tools.py` should stop doing:
 
 and instead call a small bridge like:
 - `_build_project_status(workflow_root)`
-- which delegates to `adapters.yoyopod_core.status.build_status(...)`
+- which delegates to `workflows.status.build_status(...)`
 
 This keeps the boundary honest. Relay/tools can still tolerate wrapper-backed data during migration, but they should not reach into the wrapper directly anymore.
 

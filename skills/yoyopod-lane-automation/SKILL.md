@@ -23,7 +23,7 @@ raw workflow files by hand unless the plugin CLI fails.
 
 Use the plugin CLI:
 
-`python3 /home/radxa/.hermes/workflows/yoyopod/.hermes/plugins/hermes-relay/adapters/yoyopod_core/__main__.py <command>`
+`python3 /home/radxa/.hermes/plugins/hermes-relay/workflows/__main__.py --workflow-root /home/radxa/.hermes/workflows/yoyopod <command>`
 
 ## Sources of truth
 
@@ -41,10 +41,10 @@ Use these in order:
 Use these as the primary workflow operations now:
 
 ```bash
-python3 /home/radxa/.hermes/workflows/yoyopod/.hermes/plugins/hermes-relay/adapters/yoyopod_core/__main__.py status --json
-python3 /home/radxa/.hermes/workflows/yoyopod/.hermes/plugins/hermes-relay/adapters/yoyopod_core/__main__.py tick --json
-python3 /home/radxa/.hermes/workflows/yoyopod/.hermes/plugins/hermes-relay/adapters/yoyopod_core/__main__.py dispatch-claude-review --json
-python3 /home/radxa/.hermes/workflows/yoyopod/.hermes/plugins/hermes-relay/adapters/yoyopod_core/__main__.py dispatch-implementation-turn --json
+python3 /home/radxa/.hermes/plugins/hermes-relay/workflows/__main__.py --workflow-root /home/radxa/.hermes/workflows/yoyopod status --json
+python3 /home/radxa/.hermes/plugins/hermes-relay/workflows/__main__.py --workflow-root /home/radxa/.hermes/workflows/yoyopod tick --json
+python3 /home/radxa/.hermes/plugins/hermes-relay/workflows/__main__.py --workflow-root /home/radxa/.hermes/workflows/yoyopod dispatch-claude-review --json
+python3 /home/radxa/.hermes/plugins/hermes-relay/workflows/__main__.py --workflow-root /home/radxa/.hermes/workflows/yoyopod dispatch-implementation-turn --json
 ```
 
 Important V3 semantics:
@@ -59,13 +59,13 @@ Important V3 semantics:
 ### 1. Show status
 
 ```bash
-python3 /home/radxa/.hermes/workflows/yoyopod/.hermes/plugins/hermes-relay/adapters/yoyopod_core/__main__.py status
+python3 /home/radxa/.hermes/plugins/hermes-relay/workflows/__main__.py --workflow-root /home/radxa/.hermes/workflows/yoyopod status
 ```
 
 For full machine-readable output:
 
 ```bash
-python3 /home/radxa/.hermes/workflows/yoyopod/.hermes/plugins/hermes-relay/adapters/yoyopod_core/__main__.py status --json
+python3 /home/radxa/.hermes/plugins/hermes-relay/workflows/__main__.py --workflow-root /home/radxa/.hermes/workflows/yoyopod status --json
 ```
 
 This also writes or can refresh:
@@ -77,13 +77,13 @@ This also writes or can refresh:
 Use when the ledger looks stale or an active GitHub lane is not reflected locally.
 
 ```bash
-python3 /home/radxa/.hermes/workflows/yoyopod/.hermes/plugins/hermes-relay/adapters/yoyopod_core/__main__.py reconcile
+python3 /home/radxa/.hermes/plugins/hermes-relay/workflows/__main__.py --workflow-root /home/radxa/.hermes/workflows/yoyopod reconcile
 ```
 
 To also disable broken ad-hoc issue watcher jobs with invalid Telegram announce delivery:
 
 ```bash
-python3 /home/radxa/.hermes/workflows/yoyopod/.hermes/plugins/hermes-relay/adapters/yoyopod_core/__main__.py reconcile --fix-watchers
+python3 /home/radxa/.hermes/plugins/hermes-relay/workflows/__main__.py --workflow-root /home/radxa/.hermes/workflows/yoyopod reconcile --fix-watchers
 ```
 
 ### 3. Resume the automation
@@ -91,7 +91,7 @@ python3 /home/radxa/.hermes/workflows/yoyopod/.hermes/plugins/hermes-relay/adapt
 Enable the current core workflow jobs and wake them immediately:
 
 ```bash
-python3 /home/radxa/.hermes/workflows/yoyopod/.hermes/plugins/hermes-relay/adapters/yoyopod_core/__main__.py resume
+python3 /home/radxa/.hermes/plugins/hermes-relay/workflows/__main__.py --workflow-root /home/radxa/.hermes/workflows/yoyopod resume
 ```
 
 ### 4. Run workflow doctor
@@ -99,7 +99,7 @@ python3 /home/radxa/.hermes/workflows/yoyopod/.hermes/plugins/hermes-relay/adapt
 Use this first when the workflow looks odd:
 
 ```bash
-python3 /home/radxa/.hermes/workflows/yoyopod/.hermes/plugins/hermes-relay/adapters/yoyopod_core/__main__.py doctor
+python3 /home/radxa/.hermes/plugins/hermes-relay/workflows/__main__.py --workflow-root /home/radxa/.hermes/workflows/yoyopod doctor
 ```
 
 ### 5. Pause the automation
@@ -107,7 +107,7 @@ python3 /home/radxa/.hermes/workflows/yoyopod/.hermes/plugins/hermes-relay/adapt
 Disable the current core workflow jobs:
 
 ```bash
-python3 /home/radxa/.hermes/workflows/yoyopod/.hermes/plugins/hermes-relay/adapters/yoyopod_core/__main__.py pause
+python3 /home/radxa/.hermes/plugins/hermes-relay/workflows/__main__.py --workflow-root /home/radxa/.hermes/workflows/yoyopod pause
 ```
 
 ### 6. Wake the automation now
@@ -115,24 +115,24 @@ python3 /home/radxa/.hermes/workflows/yoyopod/.hermes/plugins/hermes-relay/adapt
 Keep jobs enabled and pull their next run time forward:
 
 ```bash
-python3 /home/radxa/.hermes/workflows/yoyopod/.hermes/plugins/hermes-relay/adapters/yoyopod_core/__main__.py wake
+python3 /home/radxa/.hermes/plugins/hermes-relay/workflows/__main__.py --workflow-root /home/radxa/.hermes/workflows/yoyopod wake
 ```
 
 ### 7. Focused inspection
 
 ```bash
-python3 /home/radxa/.hermes/workflows/yoyopod/.hermes/plugins/hermes-relay/adapters/yoyopod_core/__main__.py show-active-lane
-python3 /home/radxa/.hermes/workflows/yoyopod/.hermes/plugins/hermes-relay/adapters/yoyopod_core/__main__.py show-core-jobs
-python3 /home/radxa/.hermes/workflows/yoyopod/.hermes/plugins/hermes-relay/adapters/yoyopod_core/__main__.py show-lane-state
-python3 /home/radxa/.hermes/workflows/yoyopod/.hermes/plugins/hermes-relay/adapters/yoyopod_core/__main__.py show-lane-memo
+python3 /home/radxa/.hermes/plugins/hermes-relay/workflows/__main__.py --workflow-root /home/radxa/.hermes/workflows/yoyopod show-active-lane
+python3 /home/radxa/.hermes/plugins/hermes-relay/workflows/__main__.py --workflow-root /home/radxa/.hermes/workflows/yoyopod show-core-jobs
+python3 /home/radxa/.hermes/plugins/hermes-relay/workflows/__main__.py --workflow-root /home/radxa/.hermes/workflows/yoyopod show-lane-state
+python3 /home/radxa/.hermes/plugins/hermes-relay/workflows/__main__.py --workflow-root /home/radxa/.hermes/workflows/yoyopod show-lane-memo
 ```
 
 ### 8. Cheap Claude-review preflight / event wake
 
 ```bash
-python3 /home/radxa/.hermes/workflows/yoyopod/.hermes/plugins/hermes-relay/adapters/yoyopod_core/__main__.py preflight-claude-review
-python3 /home/radxa/.hermes/workflows/yoyopod/.hermes/plugins/hermes-relay/adapters/yoyopod_core/__main__.py preflight-claude-review
-python3 /home/radxa/.hermes/workflows/yoyopod/.hermes/plugins/hermes-relay/adapters/yoyopod_core/__main__.py tick --json
+python3 /home/radxa/.hermes/plugins/hermes-relay/workflows/__main__.py --workflow-root /home/radxa/.hermes/workflows/yoyopod preflight-claude-review
+python3 /home/radxa/.hermes/plugins/hermes-relay/workflows/__main__.py --workflow-root /home/radxa/.hermes/workflows/yoyopod preflight-claude-review
+python3 /home/radxa/.hermes/plugins/hermes-relay/workflows/__main__.py --workflow-root /home/radxa/.hermes/workflows/yoyopod tick --json
 ```
 
 ## Migration / engine-ownership rules
@@ -189,7 +189,7 @@ Phase 1 session-preservation policy:
 - if the wrapper recommends `poke-session`, treat that as a one-cycle grace state for a still-open but recently idle session; do not spawn a fresh restart yet
 - record that explicit grace-state poke in `sessionNudge` / `.lane-state.json -> sessionControl.lastNudge`
 - Implementation lanes now use wrapper-managed persistent `acpx codex` sessions keyed per lane worktree, not raw one-shot ACP turns
-- the wrapper command `python3 /home/radxa/.hermes/workflows/yoyopod/.hermes/plugins/hermes-relay/adapters/yoyopod_core/__main__.py dispatch-implementation-turn --json` owns session ensure/restart/prompt delivery for the active lane
+- the wrapper command `python3 /home/radxa/.hermes/plugins/hermes-relay/workflows/__main__.py --workflow-root /home/radxa/.hermes/workflows/yoyopod dispatch-implementation-turn --json` owns session ensure/restart/prompt delivery for the active lane
 - Codex model routing for wrapper-owned implementation sessions should live in `~/.hermes/workflows/yoyopod/config/yoyopod-workflow.json` under `sessionPolicy`: use `codexModel` as the default (for example `gpt-5.3-codex-spark/high`) and `codexModelLargeEffort` for `effort:large` lanes (fallback also accepts `effort:high` label)
 - Current fixed behavior: top-level ledger field `ledger.codexModel` should stay synchronized with the live implementation model instead of leaking stale historical values from an older lane session.
 - Current fixed behavior: wrapper-owned Claude pre-publish review should use structured bounded CLI invocation (`--output-format json`, `--json-schema`, configurable `claudeReviewMaxTurns`) rather than free-form print output.

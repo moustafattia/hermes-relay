@@ -11,7 +11,7 @@ Detect the newest GitHub issue that closed after the last announced closeout, se
 
 ## Inputs
 - Repo: `/home/radxa/.hermes/workspaces/YoyoPod_Core`
-- Operator CLI: `/home/radxa/.hermes/workflows/yoyopod/.hermes/plugins/hermes-relay/adapters/yoyopod_core/__main__.py`
+- Operator CLI: `/home/radxa/.hermes/plugins/hermes-relay/workflows/__main__.py --workflow-root /home/radxa/.hermes/workflows/yoyopod`
 - Notifier state: `/home/radxa/.hermes/workflows/yoyopod/memory/hermes-yoyopod-closeout-state.json`
 - Telegram target: `telegram:-1003651617977` (the prompt may refer to this as `telegram:YoYoPod Hermes Alerts (group)`; use the chat ID when calling `send_message`)
 
@@ -34,7 +34,7 @@ Detect the newest GitHub issue that closed after the last announced closeout, se
    ```
 5. If a new closure exists, run:
    ```bash
-   python3 /home/radxa/.hermes/workflows/yoyopod/.hermes/plugins/hermes-relay/adapters/yoyopod_core/__main__.py status --json
+   python3 /home/radxa/.hermes/plugins/hermes-relay/workflows/__main__.py --workflow-root /home/radxa/.hermes/workflows/yoyopod status --json
    ```
    and use the current `activeLane.number` and `activeLane.title` in the message.
 6. Send exactly one compact Telegram message to `telegram:-1003651617977`.

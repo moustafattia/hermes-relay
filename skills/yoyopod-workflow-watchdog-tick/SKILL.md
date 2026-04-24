@@ -5,7 +5,7 @@ description: Run exactly one Hermes-owned YoyoPod workflow watchdog tick via the
 # YoyoPod workflow watchdog tick
 
 Use this skill when executing a scheduled Hermes-owned YoyoPod watchdog tick
-against the hermes-relay plugin CLI (``adapters/yoyopod_core/__main__.py``).
+against the hermes-relay plugin CLI (``workflows/__main__.py --workflow-root /home/radxa/.hermes/workflows/yoyopod``).
 
 ## Goal
 Run one tick, then report only the mandated outcome.
@@ -13,7 +13,7 @@ Run one tick, then report only the mandated outcome.
 ## Procedure
 1. Run:
    ```bash
-   python3 /home/radxa/.hermes/workflows/yoyopod/.hermes/plugins/hermes-relay/adapters/yoyopod_core/__main__.py tick --json
+   python3 /home/radxa/.hermes/plugins/hermes-relay/workflows/__main__.py --workflow-root /home/radxa/.hermes/workflows/yoyopod tick --json
    ```
 2. If the command returns JSON, inspect `action.type`.
 3. If `action.type == "noop"`, the final response must be exactly:
