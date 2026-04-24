@@ -1,5 +1,5 @@
 name: hermes-relay
-version: 0.1.0
+version: 0.2.0
 description: Hermes Relay operator control surface and runtime plugin.
 author: Hermes Agent
 provides_hooks: []
