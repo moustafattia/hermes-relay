@@ -443,7 +443,7 @@ def init_daedalus_db(*, workflow_root: Path, project_key: str) -> dict[str, Any]
         )
         now_iso = _now_iso()
         runtime_row = conn.execute(
-            "SELECT schema_version FROM daedalus_runtime WHERE runtime_id='relay'"
+            "SELECT schema_version FROM daedalus_runtime WHERE runtime_id='daedalus'"
         ).fetchone()
         current_schema_version = int(runtime_row[0]) if runtime_row else DAEDALUS_SCHEMA_VERSION
         if runtime_row is None:
@@ -458,14 +458,14 @@ def init_daedalus_db(*, workflow_root: Path, project_key: str) -> dict[str, Any]
                 ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?, ?)
                 """,
                 (
-                    "relay",
+                    "daedalus",
                     project_key,
                     DAEDALUS_SCHEMA_VERSION,
                     "initialized",
                     "Hermes Relay",
                     "Workflow_Orchestrator",
                     "shadow",
-                    "relay-shadow-v1",
+                    "daedalus-shadow-v1",
                     now_iso,
                     now_iso,
                 ),
@@ -477,7 +477,7 @@ def init_daedalus_db(*, workflow_root: Path, project_key: str) -> dict[str, Any]
                 """
                 UPDATE daedalus_runtime
                 SET project_key=?, updated_at=?
-                WHERE runtime_id='relay'
+                WHERE runtime_id='daedalus'
                 """,
                 (project_key, now_iso),
             )
@@ -487,7 +487,7 @@ def init_daedalus_db(*, workflow_root: Path, project_key: str) -> dict[str, Any]
                     """
                     UPDATE daedalus_runtime
                     SET schema_version=?, updated_at=?
-                    WHERE runtime_id='relay'
+                    WHERE runtime_id='daedalus'
                     """,
                     (DAEDALUS_SCHEMA_VERSION, now_iso),
                 )
@@ -750,7 +750,7 @@ def bootstrap_runtime(
             """
             UPDATE daedalus_runtime
             SET runtime_status=?, active_orchestrator_instance_id=?, current_mode=?, latest_boot_at=?, latest_heartbeat_at=?, updated_at=?
-            WHERE runtime_id='relay'
+            WHERE runtime_id='daedalus'
             """,
             ("running", instance_id, mode, now_iso, now_iso, now_iso),
         )
@@ -796,7 +796,7 @@ def get_runtime_status(*, workflow_root: Path) -> dict[str, Any]:
                    active_orchestrator_instance_id, current_mode,
                    latest_boot_at, latest_heartbeat_at, updated_at
             FROM daedalus_runtime
-            WHERE runtime_id='relay'
+            WHERE runtime_id='daedalus'
             """
         ).fetchone()
         lane_count = conn.execute("SELECT COUNT(*) FROM lanes").fetchone()[0]
@@ -804,7 +804,7 @@ def get_runtime_status(*, workflow_root: Path) -> dict[str, Any]:
         conn.close()
     if not runtime:
         return {
-            "runtime_id": "relay",
+            "runtime_id": "daedalus",
             "runtime_status": "missing",
             "current_mode": None,
             "active_orchestrator_instance_id": None,
@@ -1812,7 +1812,7 @@ def reap_stuck_dispatched_actions(*, workflow_root: Path, lane_id: str, now_iso:
                 """
                 UPDATE daedalus_runtime
                 SET latest_error_at=?, latest_error_summary=?, updated_at=?
-                WHERE runtime_id='relay'
+                WHERE runtime_id='daedalus'
                 """,
                 (now_iso, failure_summary, now_iso),
             )
@@ -3054,7 +3054,7 @@ def execute_requested_action(
                 """
                 UPDATE daedalus_runtime
                 SET latest_error_at=?, latest_error_summary=?, updated_at=?
-                WHERE runtime_id='relay'
+                WHERE runtime_id='daedalus'
                 """,
                 (now_iso, failure_summary, now_iso),
             )
@@ -3242,7 +3242,7 @@ def refresh_runtime_lease(*, workflow_root: Path, instance_id: str, now_iso: str
     conn = _connect(paths["db_path"])
     try:
         conn.execute(
-            "UPDATE daedalus_runtime SET latest_heartbeat_at=?, updated_at=? WHERE runtime_id='relay'",
+            "UPDATE daedalus_runtime SET latest_heartbeat_at=?, updated_at=? WHERE runtime_id='daedalus'",
             (now_iso, now_iso),
         )
         conn.commit()
@@ -3331,7 +3331,7 @@ def reconcile_stalled_recoveries(*, workflow_root: Path, lane_id: str, now_iso: 
                     """
                     UPDATE daedalus_runtime
                     SET latest_error_at=?, latest_error_summary=?, updated_at=?
-                    WHERE runtime_id='relay'
+                    WHERE runtime_id='daedalus'
                     """,
                     (now_iso, f"stalled recovery detected for {reason}", now_iso),
                 )

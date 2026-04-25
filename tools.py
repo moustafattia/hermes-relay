@@ -27,7 +27,7 @@ def resolve_default_workflow_root() -> Path:
 
 DEFAULT_WORKFLOW_ROOT = resolve_default_workflow_root()
 DEFAULT_PROJECT_KEY = "yoyopod"
-DEFAULT_INSTANCE_ID = "relay-plugin"
+DEFAULT_INSTANCE_ID = "daedalus-plugin"
 DEFAULT_SHADOW_SERVICE_INSTANCE_ID = "relay-shadow-service-1"
 DEFAULT_SHADOW_SERVICE_NAME = "yoyopod-relay-shadow.service"
 DEFAULT_ACTIVE_SERVICE_INSTANCE_ID = "relay-active-service-1"
