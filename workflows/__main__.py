@@ -1,8 +1,15 @@
 """Plugin-level CLI entrypoint for the workflow dispatcher.
 
-Invocation:
+Invocation forms (both supported):
 
     python3 -m workflows --workflow-root <path> <subcommand> [args ...]
+    python3 /path/to/plugin/workflows/__main__.py --workflow-root <path> <subcommand>
+
+The script-form invocation is what runtime.py's action runners use (via
+paths.workflow_cli_argv). When invoked as a script, sys.path[0] is the
+script's containing directory (``.../workflows/``) instead of the plugin
+root, so ``from workflows import run_cli`` would fail. We compensate by
+inserting the plugin root onto sys.path before the import.
 
 If ``--workflow-root`` is omitted, the entrypoint honors these env vars
 (first match wins): ``DAEDALUS_WORKFLOW_ROOT``, ``YOYOPOD_WORKFLOW_ROOT``.
@@ -15,6 +22,13 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+
+# Put the plugin root (parent of this workflows/ package) on sys.path so
+# `from workflows import ...` works when invoked as a script. No-op when
+# invoked via `python3 -m workflows` (sys.path[0] is already correct).
+_PLUGIN_ROOT = str(Path(__file__).resolve().parent.parent)
+if _PLUGIN_ROOT not in sys.path:
+    sys.path.insert(0, _PLUGIN_ROOT)
 
 from workflows import run_cli
 
