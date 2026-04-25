@@ -758,8 +758,8 @@ def bootstrap_runtime(
     finally:
         conn.close()
     event = {
-        "event_id": f"evt:relay_runtime_started:{instance_id}:{now_iso}",
-        "event_type": "relay_runtime_started",
+        "event_id": f"evt:daedalus_runtime_started:{instance_id}:{now_iso}",
+        "event_type": "daedalus_runtime_started",
         "event_version": 1,
         "created_at": now_iso,
         "producer": "Relay_Runtime",
@@ -769,7 +769,7 @@ def bootstrap_runtime(
         "head_sha": None,
         "causal_event_id": None,
         "causal_action_id": None,
-        "dedupe_key": f"relay_runtime_started:{instance_id}:{mode}",
+        "dedupe_key": f"daedalus_runtime_started:{instance_id}:{mode}",
         "payload": {
             "instance_id": instance_id,
             "mode": mode,
@@ -3251,8 +3251,8 @@ def refresh_runtime_lease(*, workflow_root: Path, instance_id: str, now_iso: str
     append_daedalus_event(
         event_log_path=paths["event_log_path"],
         event={
-            "event_id": f"evt:relay_runtime_heartbeat:{instance_id}:{now_iso}",
-            "event_type": "relay_runtime_heartbeat",
+            "event_id": f"evt:daedalus_runtime_heartbeat:{instance_id}:{now_iso}",
+            "event_type": "daedalus_runtime_heartbeat",
             "event_version": 1,
             "created_at": now_iso,
             "producer": "Relay_Runtime",
@@ -3262,7 +3262,7 @@ def refresh_runtime_lease(*, workflow_root: Path, instance_id: str, now_iso: str
             "head_sha": None,
             "causal_event_id": None,
             "causal_action_id": None,
-            "dedupe_key": f"relay_runtime_heartbeat:{instance_id}:{now_iso}",
+            "dedupe_key": f"daedalus_runtime_heartbeat:{instance_id}:{now_iso}",
             "payload": {"instance_id": instance_id, "ttl_seconds": ttl_seconds},
         },
     )
