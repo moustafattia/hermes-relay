@@ -241,7 +241,7 @@ def _build_adapter_module_loaders(workspace_root: Path) -> dict[str, Any]:
     """
     import importlib.util as _importlib_util
 
-    plugin_root = workspace_root / ".hermes" / "plugins" / "hermes-relay"
+    plugin_root = workspace_root / ".hermes" / "plugins" / "daedalus"
     cache: dict[str, Any] = {}
 
     def _load_adapter_module(name: str):

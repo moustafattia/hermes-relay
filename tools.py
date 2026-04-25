@@ -189,7 +189,7 @@ def _service_instance_name(*, service_mode: str = "shadow", workspace: str) -> s
 
 
 def _expected_plugin_runtime_path(workflow_root: Path) -> Path:
-    return workflow_root / ".hermes" / "plugins" / "hermes-relay" / "runtime.py"
+    return workflow_root / ".hermes" / "plugins" / "daedalus" / "runtime.py"
 
 
 

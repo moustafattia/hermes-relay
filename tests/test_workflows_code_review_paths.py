@@ -69,7 +69,7 @@ def test_plugin_entrypoint_path_points_at_generic_dispatcher(tmp_path):
         workflow_root.resolve()
         / ".hermes"
         / "plugins"
-        / "hermes-relay"
+        / "daedalus"
         / "workflows"
         / "__main__.py"
     )
@@ -104,7 +104,7 @@ def test_workflow_cli_argv_always_targets_generic_dispatcher(tmp_path):
 
     argv = paths_module.workflow_cli_argv(workflow_root, "status", "--json")
     assert argv[0] == "python3"
-    assert argv[1].endswith("/.hermes/plugins/hermes-relay/workflows/__main__.py")
+    assert argv[1].endswith("/.hermes/plugins/daedalus/workflows/__main__.py")
     assert argv[2:] == ["status", "--json"]
 
     # Even if a retired-style wrapper script appears under scripts/, it is
@@ -113,4 +113,4 @@ def test_workflow_cli_argv_always_targets_generic_dispatcher(tmp_path):
     wrapper.parent.mkdir(parents=True)
     wrapper.write_text("# retired\n", encoding="utf-8")
     argv2 = paths_module.workflow_cli_argv(workflow_root, "tick")
-    assert argv2[1].endswith("/.hermes/plugins/hermes-relay/workflows/__main__.py")
+    assert argv2[1].endswith("/.hermes/plugins/daedalus/workflows/__main__.py")

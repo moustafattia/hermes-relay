@@ -64,14 +64,14 @@ def tick_dispatch_history_dir(workflow_root: Path) -> Path:
 def plugin_entrypoint_path(workflow_root: Path) -> Path:
     """Path to the installed plugin's generic CLI dispatcher.
 
-    Lives at ``<workflow_root>/.hermes/plugins/hermes-relay/workflows/__main__.py``.
+    Lives at ``<workflow_root>/.hermes/plugins/daedalus/workflows/__main__.py``.
     This is the canonical external-caller surface (systemd, cron, operator
     commands, skill docs all reference this path). Per-workflow direct-form
     invocations use ``python3 -m workflows.<name>`` inside the plugin root.
     """
     root = workflow_root.resolve()
     return (
-        root / ".hermes" / "plugins" / "hermes-relay" / "workflows" / "__main__.py"
+        root / ".hermes" / "plugins" / "daedalus" / "workflows" / "__main__.py"
     )
 
 
