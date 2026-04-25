@@ -17,6 +17,22 @@ from workflows.code_review.paths import (
 from workflows.code_review.status import build_status as build_yoyopod_core_status
 import sys
 
+def _load_migration_module():
+    """Load the sibling migration.py module via file path.
+
+    Mirrors tools.py::_load_relay_module / alerts.py::_load_tools_module
+    so runtime.py works whether loaded as part of the hermes_relay package
+    or directly via spec_from_file_location.
+    """
+    module_path = Path(__file__).resolve().parent / "migration.py"
+    spec = importlib.util.spec_from_file_location("daedalus_migration_for_runtime", module_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"unable to load migration module from {module_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 RELAY_SCHEMA_VERSION = 2
 RUNTIME_LEASE_KEY = "primary-orchestrator"
 RUNTIME_LEASE_SCOPE = "runtime"
@@ -210,17 +226,7 @@ def _migrate_schema_identity(conn) -> None:
 def init_relay_db(*, workflow_root: Path, project_key: str) -> dict[str, Any]:
     # 1. Filesystem-level migration (renames relay-era files if present).
     #    Done before opening the DB so we don't open a stale empty file.
-    try:
-        from migration import migrate_filesystem_state
-    except ImportError:
-        # Standalone-script fallback (dual-import pattern).
-        from importlib.util import spec_from_file_location, module_from_spec
-        _migration_path = Path(__file__).resolve().parent / "migration.py"
-        _spec = spec_from_file_location("daedalus_migration_for_runtime", _migration_path)
-        _module = module_from_spec(_spec)
-        _spec.loader.exec_module(_module)
-        migrate_filesystem_state = _module.migrate_filesystem_state
-    migrate_filesystem_state(workflow_root)
+    _load_migration_module().migrate_filesystem_state(workflow_root)
 
     # 2. Resolve canonical paths and open the DB.
     paths = runtime_paths(workflow_root)

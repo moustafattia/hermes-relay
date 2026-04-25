@@ -73,6 +73,10 @@ def test_init_relay_db_migrates_execution_control_to_clean_schema(runtime_module
     # (where runtime_paths still points). This isolates the test to
     # the SQL-schema migration path without coupling to the in-progress
     # paths.py rename (Task 2.1).
+    # TODO(daedalus-rename Task 2.1): remove this pre-create workaround once
+    # runtime_paths returns state/daedalus/daedalus.db. The test should then
+    # let migrate_filesystem_state do a real rename of the seeded relay.db
+    # instead of triggering the migrator's "new DB exists, skip" short-circuit.
     daedalus_db = workflow_root / "state" / "daedalus" / "daedalus.db"
     daedalus_db.parent.mkdir(parents=True, exist_ok=True)
     daedalus_db.touch()
