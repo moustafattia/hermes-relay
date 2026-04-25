@@ -10,6 +10,7 @@ from typing import Any
 
 from workflows.code_review.paths import (
     plugin_entrypoint_path,
+    runtime_paths,
     runtime_paths as yoyopod_runtime_paths,
     yoyopod_cli_argv,
 )
@@ -206,9 +207,30 @@ def _migrate_schema_identity(conn) -> None:
         )
 
 
-def init_relay_db(*, db_path: Path, project_key: str) -> dict[str, Any]:
+def init_relay_db(*, workflow_root: Path, project_key: str) -> dict[str, Any]:
+    # 1. Filesystem-level migration (renames relay-era files if present).
+    #    Done before opening the DB so we don't open a stale empty file.
+    try:
+        from migration import migrate_filesystem_state
+    except ImportError:
+        # Standalone-script fallback (dual-import pattern).
+        from importlib.util import spec_from_file_location, module_from_spec
+        _migration_path = Path(__file__).resolve().parent / "migration.py"
+        _spec = spec_from_file_location("daedalus_migration_for_runtime", _migration_path)
+        _module = module_from_spec(_spec)
+        _spec.loader.exec_module(_module)
+        migrate_filesystem_state = _module.migrate_filesystem_state
+    migrate_filesystem_state(workflow_root)
+
+    # 2. Resolve canonical paths and open the DB.
+    paths = runtime_paths(workflow_root)
+    db_path = paths["db_path"]
     conn = _connect(db_path)
     try:
+        # 3. SQL identity migration (rename relay_runtime -> daedalus_runtime
+        #    if needed). Must run BEFORE the CREATE TABLE statements below.
+        _migrate_schema_identity(conn)
+
         conn.executescript(
             """
             CREATE TABLE IF NOT EXISTS relay_runtime (
@@ -587,7 +609,7 @@ def _default_execution_control(*, now_iso: str | None = None) -> dict[str, Any]:
 
 def get_execution_control(*, workflow_root: Path) -> dict[str, Any]:
     paths = _runtime_paths(workflow_root)
-    init_relay_db(db_path=paths["db_path"], project_key="yoyopod")
+    init_relay_db(workflow_root=workflow_root, project_key="yoyopod")
     conn = _connect(paths["db_path"])
     try:
         row = conn.execute(
@@ -616,7 +638,7 @@ def set_execution_control(
     now_iso = now_iso or _now_iso()
     metadata = metadata or {}
     paths = _runtime_paths(workflow_root)
-    init_relay_db(db_path=paths["db_path"], project_key="yoyopod")
+    init_relay_db(workflow_root=workflow_root, project_key="yoyopod")
     conn = _connect(paths["db_path"])
     try:
         conn.execute(
@@ -698,7 +720,7 @@ def bootstrap_runtime(
 ) -> dict[str, Any]:
     now_iso = now_iso or _now_iso()
     paths = _runtime_paths(workflow_root)
-    init_relay_db(db_path=paths["db_path"], project_key=project_key)
+    init_relay_db(workflow_root=workflow_root, project_key=project_key)
     lease = acquire_lease(
         db_path=paths["db_path"],
         lease_scope=RUNTIME_LEASE_SCOPE,
@@ -3677,7 +3699,7 @@ def main() -> int:
     workflow_root = Path(args.workflow_root)
     paths = _runtime_paths(workflow_root)
     if args.command == "init":
-        result = init_relay_db(db_path=paths["db_path"], project_key=args.project_key)
+        result = init_relay_db(workflow_root=workflow_root, project_key=args.project_key)
         print(json.dumps(result, indent=2) if args.json else f"initialized {result['db_path']}")
         return 0
     if args.command == "start":

@@ -43,7 +43,9 @@ def test_iso_to_epoch_uses_utc_timegm(runtime_module, monkeypatch):
 
 
 def test_init_relay_db_migrates_execution_control_to_clean_schema(runtime_module, tmp_path):
-    db_path = tmp_path / "relay.db"
+    workflow_root = tmp_path / "workflow"
+    db_path = runtime_module._runtime_paths(workflow_root)["db_path"]
+    db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
     try:
         conn.execute(
@@ -66,7 +68,16 @@ def test_init_relay_db_migrates_execution_control_to_clean_schema(runtime_module
     finally:
         conn.close()
 
-    runtime_module.init_relay_db(db_path=db_path, project_key="yoyopod")
+    # Pre-create the daedalus DB target so the filesystem migrator
+    # detects the conflict and leaves the seeded relay.db in place
+    # (where runtime_paths still points). This isolates the test to
+    # the SQL-schema migration path without coupling to the in-progress
+    # paths.py rename (Task 2.1).
+    daedalus_db = workflow_root / "state" / "daedalus" / "daedalus.db"
+    daedalus_db.parent.mkdir(parents=True, exist_ok=True)
+    daedalus_db.touch()
+
+    runtime_module.init_relay_db(workflow_root=workflow_root, project_key="yoyopod")
 
     conn = sqlite3.connect(db_path)
     try:
@@ -97,7 +108,7 @@ def test_init_relay_db_migrates_execution_control_to_clean_schema(runtime_module
 def test_ingest_legacy_status_preserves_active_action_operator_attention(runtime_module, tmp_path):
     workflow_root = tmp_path / "workflow"
     paths = runtime_module._runtime_paths(workflow_root)
-    runtime_module.init_relay_db(db_path=paths["db_path"], project_key="yoyopod")
+    runtime_module.init_relay_db(workflow_root=workflow_root, project_key="yoyopod")
 
     legacy_status = {
         "activeLane": {"number": 221, "url": "https://example.com/issues/221", "title": "Issue 221", "labels": []},
@@ -157,7 +168,7 @@ def test_ingest_legacy_status_preserves_active_action_operator_attention(runtime
 def test_request_active_actions_event_payload_uses_retry_count(runtime_module, tmp_path, monkeypatch):
     workflow_root = tmp_path / "workflow"
     paths = runtime_module._runtime_paths(workflow_root)
-    runtime_module.init_relay_db(db_path=paths["db_path"], project_key="yoyopod")
+    runtime_module.init_relay_db(workflow_root=workflow_root, project_key="yoyopod")
 
     now_iso = "2026-04-22T00:00:00Z"
     conn = runtime_module._connect(paths["db_path"])
@@ -238,7 +249,7 @@ def test_request_active_actions_event_payload_uses_retry_count(runtime_module, t
 def test_reap_stuck_dispatched_actions_marks_dispatcher_lost_and_queues_recovery(runtime_module, tmp_path):
     workflow_root = tmp_path / "workflow"
     paths = runtime_module._runtime_paths(workflow_root)
-    runtime_module.init_relay_db(db_path=paths["db_path"], project_key="yoyopod")
+    runtime_module.init_relay_db(workflow_root=workflow_root, project_key="yoyopod")
 
     now_iso = "2026-04-22T01:00:00Z"
     conn = runtime_module._connect(paths["db_path"])
