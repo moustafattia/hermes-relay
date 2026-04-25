@@ -134,16 +134,31 @@ Two factories are provided:
   ``orchestrator``, etc.) looks up workspace attributes by name, so any
   duck-typed accessor works.
 * :func:`load_workspace_from_config` — convenience wrapper that reads the
-  project ``config/yoyopod-workflow.json`` file and applies the same derived
-  constants the wrapper used to.
+  project workflow config (``config/workflow.yaml`` post-migration, falling
+  back to the legacy ``config/yoyopod-workflow.json``) and applies the same
+  derived constants the wrapper used to.
 """
 
 
 DEFAULT_CONFIG_FILENAME = "config/yoyopod-workflow.json"
+DEFAULT_YAML_CONFIG_FILENAME = "config/workflow.yaml"
 
 
 def _load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _load_yaml(path: Path) -> dict[str, Any]:
+    """Load a YAML mapping file. Imported lazily so workspaces that only ever
+    use the legacy JSON path don't pay the PyYAML import cost."""
+    import yaml  # type: ignore[import]
+
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError(
+            f"{path} must contain a YAML mapping at the top level"
+        )
+    return data
 
 
 def _write_json(path: Path, payload: Any) -> None:
@@ -1881,6 +1896,34 @@ def load_workspace_from_config(
     workspace_root: Path,
     config_path: Path | None = None,
 ) -> SimpleNamespace:
-    """Convenience factory: read ``config/yoyopod-workflow.json`` and build a workspace."""
-    path = config_path or (workspace_root / DEFAULT_CONFIG_FILENAME)
-    return make_workspace(workspace_root=Path(workspace_root), config=_load_json(path))
+    """Convenience factory: read the workflow config and build a workspace.
+
+    Resolution order when ``config_path`` is not supplied:
+
+    1. ``config/workflow.yaml`` — canonical post-migration source of truth.
+       Parsed as YAML; the YAML→legacy-view bridge in :func:`make_workspace`
+       projects it onto the JSON-shaped config the body still consumes.
+    2. ``config/yoyopod-workflow.json`` — legacy unmigrated workspaces only.
+       Read as JSON.
+
+    When ``config_path`` is supplied explicitly, the suffix decides the
+    parser: ``.yaml``/``.yml`` → YAML, otherwise JSON. This preserves
+    back-compat with callers that pass an explicit JSON path.
+    """
+    workspace_root = Path(workspace_root)
+    if config_path is not None:
+        path = Path(config_path)
+        if path.suffix.lower() in {".yaml", ".yml"}:
+            config = _load_yaml(path)
+        else:
+            config = _load_json(path)
+        return make_workspace(workspace_root=workspace_root, config=config)
+
+    yaml_path = workspace_root / DEFAULT_YAML_CONFIG_FILENAME
+    if yaml_path.exists():
+        return make_workspace(
+            workspace_root=workspace_root, config=_load_yaml(yaml_path)
+        )
+
+    json_path = workspace_root / DEFAULT_CONFIG_FILENAME
+    return make_workspace(workspace_root=workspace_root, config=_load_json(json_path))
