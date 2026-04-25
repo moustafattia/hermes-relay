@@ -223,7 +223,7 @@ def _migrate_schema_identity(conn) -> None:
         )
 
 
-def init_relay_db(*, workflow_root: Path, project_key: str) -> dict[str, Any]:
+def init_daedalus_db(*, workflow_root: Path, project_key: str) -> dict[str, Any]:
     # 1. Filesystem-level migration (renames relay-era files if present).
     #    Done before opening the DB so we don't open a stale empty file.
     _load_migration_module().migrate_filesystem_state(workflow_root)
@@ -615,7 +615,7 @@ def _default_execution_control(*, now_iso: str | None = None) -> dict[str, Any]:
 
 def get_execution_control(*, workflow_root: Path) -> dict[str, Any]:
     paths = _runtime_paths(workflow_root)
-    init_relay_db(workflow_root=workflow_root, project_key="yoyopod")
+    init_daedalus_db(workflow_root=workflow_root, project_key="yoyopod")
     conn = _connect(paths["db_path"])
     try:
         row = conn.execute(
@@ -644,7 +644,7 @@ def set_execution_control(
     now_iso = now_iso or _now_iso()
     metadata = metadata or {}
     paths = _runtime_paths(workflow_root)
-    init_relay_db(workflow_root=workflow_root, project_key="yoyopod")
+    init_daedalus_db(workflow_root=workflow_root, project_key="yoyopod")
     conn = _connect(paths["db_path"])
     try:
         conn.execute(
@@ -726,7 +726,7 @@ def bootstrap_runtime(
 ) -> dict[str, Any]:
     now_iso = now_iso or _now_iso()
     paths = _runtime_paths(workflow_root)
-    init_relay_db(workflow_root=workflow_root, project_key=project_key)
+    init_daedalus_db(workflow_root=workflow_root, project_key=project_key)
     lease = acquire_lease(
         db_path=paths["db_path"],
         lease_scope=RUNTIME_LEASE_SCOPE,
@@ -3705,7 +3705,7 @@ def main() -> int:
     workflow_root = Path(args.workflow_root)
     paths = _runtime_paths(workflow_root)
     if args.command == "init":
-        result = init_relay_db(workflow_root=workflow_root, project_key=args.project_key)
+        result = init_daedalus_db(workflow_root=workflow_root, project_key=args.project_key)
         print(json.dumps(result, indent=2) if args.json else f"initialized {result['db_path']}")
         return 0
     if args.command == "start":

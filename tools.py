@@ -1123,7 +1123,7 @@ def execute_namespace(args: argparse.Namespace) -> dict[str, Any]:
     paths = relay._runtime_paths(workflow_root) if relay is not None else None
 
     if args.relay_command == "init":
-        return relay.init_relay_db(workflow_root=workflow_root, project_key=args.project_key)
+        return relay.init_daedalus_db(workflow_root=workflow_root, project_key=args.project_key)
     if args.relay_command == "start":
         return relay.bootstrap_runtime(
             workflow_root=workflow_root,
