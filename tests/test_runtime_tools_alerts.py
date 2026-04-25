@@ -484,7 +484,7 @@ def test_execute_raw_args_catches_unexpected_exception(tools_module, monkeypatch
 
 
 def test_install_supervised_service_requires_plugin_runtime(tools_module, tmp_path):
-    with pytest.raises(tools_module.RelayCommandError, match="relay plugin runtime not found"):
+    with pytest.raises(tools_module.DaedalusCommandError, match="relay plugin runtime not found"):
         tools_module.install_supervised_service(
             workflow_root=tmp_path,
             project_key="yoyopod",

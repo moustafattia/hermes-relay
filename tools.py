@@ -50,20 +50,20 @@ SERVICE_PROFILES = {
 }
 
 
-class RelayCommandError(Exception):
+class DaedalusCommandError(Exception):
     pass
 
 
-class RelayArgumentParser(argparse.ArgumentParser):
+class DaedalusArgumentParser(argparse.ArgumentParser):
     def error(self, message):
-        raise RelayCommandError(f"{message}\n\n{self.format_usage().strip()}")
+        raise DaedalusCommandError(f"{message}\n\n{self.format_usage().strip()}")
 
 
 def _load_relay_module(workflow_root: Path):
     module_path = PLUGIN_DIR / "runtime.py"
     spec = importlib.util.spec_from_file_location("yoyopod_relay_plugin_runtime", module_path)
     if spec is None or spec.loader is None:
-        raise RelayCommandError(f"unable to load Relay runtime from plugin package: {module_path}")
+        raise DaedalusCommandError(f"unable to load Relay runtime from plugin package: {module_path}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -159,7 +159,7 @@ def _systemd_user_dir() -> Path:
 def _service_profile(service_mode: str) -> dict[str, str]:
     profile = SERVICE_PROFILES.get(service_mode)
     if profile is None:
-        raise RelayCommandError(f"unknown service mode: {service_mode}")
+        raise DaedalusCommandError(f"unknown service mode: {service_mode}")
     return profile
 
 
@@ -242,7 +242,7 @@ def install_supervised_service(
 ) -> dict[str, Any]:
     plugin_runtime_path = _expected_plugin_runtime_path(workflow_root)
     if not plugin_runtime_path.exists():
-        raise RelayCommandError(
+        raise DaedalusCommandError(
             f"relay plugin runtime not found at {plugin_runtime_path}; install/copy the plugin payload into the workflow root before installing the service"
         )
     resolved_service_name = _resolve_service_name(service_name=service_name, service_mode=service_mode)
@@ -393,7 +393,7 @@ def build_shadow_report(*, workflow_root: Path, recent_actions_limit: int = 5) -
     relay = _load_relay_module(workflow_root)
     runtime_status = relay.get_runtime_status(workflow_root=workflow_root)
     if runtime_status.get("runtime_status") == "missing":
-        raise RelayCommandError("Relay runtime is not initialized; run `relay start` first")
+        raise DaedalusCommandError("Relay runtime is not initialized; run `relay start` first")
 
     legacy_status = _build_project_status(workflow_root)
     now_iso = relay._now_iso()
@@ -1058,7 +1058,7 @@ def configure_subcommands(parser: argparse.ArgumentParser) -> argparse.ArgumentP
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = RelayArgumentParser(prog="relay", description="YoYoPod Relay operator control surface.")
+    parser = DaedalusArgumentParser(prog="relay", description="YoYoPod Relay operator control surface.")
     return configure_subcommands(parser)
 
 
@@ -1073,7 +1073,7 @@ def _run_wrapper_json_command(*, workflow_root: Path, command: str) -> dict[str,
         check=False,
     )
     if completed.returncode != 0:
-        raise RelayCommandError(
+        raise DaedalusCommandError(
             completed.stderr.strip() or completed.stdout.strip() or f"wrapper command failed: {command}"
         )
     return json.loads(completed.stdout)
@@ -1234,7 +1234,7 @@ def execute_namespace(args: argparse.Namespace) -> dict[str, Any]:
             workflow_root=workflow_root,
             failure_id=args.failure_id,
         )
-    raise RelayCommandError(f"unknown relay command: {args.relay_command}")
+    raise DaedalusCommandError(f"unknown relay command: {args.relay_command}")
 
 
 def render_result(command: str, result: dict[str, Any], *, json_output: bool) -> str:
@@ -1403,7 +1403,7 @@ def execute_raw_args(raw_args: str) -> str:
         args._command_source = "plugin-command"
         result = execute_namespace(args)
         return render_result(args.relay_command, result, json_output=getattr(args, "json", False))
-    except RelayCommandError as exc:
+    except DaedalusCommandError as exc:
         return f"relay error: {exc}"
     except SystemExit:
         detail = stderr_buffer.getvalue().strip()
