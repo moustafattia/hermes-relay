@@ -521,7 +521,31 @@ def make_workspace(*, workspace_root: Path, config: dict[str, Any]) -> SimpleNam
     def save_ledger(payload: dict[str, Any]) -> None:
         _write_json(ledger_path, payload)
 
-    audit = _make_audit_fn(audit_log_path=audit_log_path, publisher=None)
+    # Wire the comment publisher (returns None when observability is disabled —
+    # the audit hook then becomes a pure log-write with no GitHub I/O).
+    _ns_holder: dict[str, Any] = {}
+
+    def _ns_load_ledger() -> dict[str, Any]:
+        ns_obj = _ns_holder.get("ns")
+        if ns_obj is None or not hasattr(ns_obj, "load_ledger"):
+            return {}
+        try:
+            return ns_obj.load_ledger() or {}
+        except Exception:
+            return {}
+
+    _repo_slug = ((yaml_cfg or {}).get("repository") or {}).get("github-slug") or ""
+    _publisher = _make_comment_publisher(
+        workflow_root=workspace_root,
+        repo_slug=_repo_slug,
+        workflow_yaml=yaml_cfg or {},
+        get_active_issue_number=lambda: (_ns_load_ledger().get("activeLane") or {}).get("number"),
+        get_workflow_state=lambda: _ns_load_ledger().get("workflowState") or "unknown",
+        get_is_operator_attention=lambda: (
+            _ns_load_ledger().get("workflowState") == "operator_attention_required"
+        ),
+    )
+    audit = _make_audit_fn(audit_log_path=audit_log_path, publisher=_publisher)
 
     # Pre-declared so closures below can resolve them once ``ns`` is built.
     # Bindings happen after ``ns`` is created, below.
@@ -614,6 +638,8 @@ def make_workspace(*, workspace_root: Path, config: dict[str, Any]) -> SimpleNam
         save_ledger=save_ledger,
         audit=audit,
     )
+    # Bind ns into the publisher's holder so its lambdas can read load_ledger().
+    _ns_holder["ns"] = ns
     # Adapter module loaders (cached per-workspace).
     for loader_name, loader_fn in _build_adapter_module_loaders(workspace_root).items():
         setattr(ns, loader_name, loader_fn)
