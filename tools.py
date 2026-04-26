@@ -1084,6 +1084,80 @@ def cmd_migrate_systemd(args, parser) -> str:
     return "\n".join(lines)
 
 
+def cmd_set_observability(args, parser) -> str:
+    """``/daedalus set-observability --workflow X --github-comments on|off|unset``."""
+    try:
+        from observability_overrides import set_override, unset_override
+    except ImportError:
+        path = PLUGIN_DIR / "observability_overrides.py"
+        spec = importlib.util.spec_from_file_location("daedalus_observability_overrides_for_cli", path)
+        if spec is None or spec.loader is None:
+            raise DaedalusCommandError(f"unable to load observability_overrides from {path}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        set_override = module.set_override
+        unset_override = module.unset_override
+
+    workflow_root = Path(args.workflow_root).expanduser().resolve()
+    state_dir = workflow_root / "runtime" / "state" / "daedalus"
+    workflow_name = args.workflow
+    setting = (args.github_comments or "").strip().lower()
+
+    if setting == "on":
+        set_override(state_dir, workflow_name=workflow_name, github_comments_enabled=True)
+        return f"observability override set: {workflow_name}.github-comments = on"
+    if setting == "off":
+        set_override(state_dir, workflow_name=workflow_name, github_comments_enabled=False)
+        return f"observability override set: {workflow_name}.github-comments = off"
+    if setting == "unset":
+        unset_override(state_dir, workflow_name=workflow_name)
+        return f"observability override removed for {workflow_name}"
+    raise DaedalusCommandError(
+        f"--github-comments must be one of: on, off, unset (got {args.github_comments!r})"
+    )
+
+
+def cmd_get_observability(args, parser) -> str:
+    """``/daedalus get-observability --workflow X``: show effective config + source."""
+    try:
+        from workflows.code_review.observability import resolve_effective_config
+    except ImportError:
+        path = PLUGIN_DIR / "workflows" / "code_review" / "observability.py"
+        spec = importlib.util.spec_from_file_location("daedalus_observability_for_cli", path)
+        if spec is None or spec.loader is None:
+            raise DaedalusCommandError(f"unable to load observability resolver from {path}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        resolve_effective_config = module.resolve_effective_config
+
+    workflow_root = Path(args.workflow_root).expanduser().resolve()
+    workflow_name = args.workflow
+    config_yaml_path = workflow_root / "config" / "workflow.yaml"
+    workflow_yaml = {}
+    if config_yaml_path.exists():
+        try:
+            import yaml as _yaml
+            workflow_yaml = _yaml.safe_load(config_yaml_path.read_text(encoding="utf-8")) or {}
+        except Exception as exc:
+            return f"error reading workflow.yaml: {exc}"
+
+    eff = resolve_effective_config(
+        workflow_yaml=workflow_yaml,
+        override_dir=workflow_root / "runtime" / "state" / "daedalus",
+        workflow_name=workflow_name,
+    )
+    gh = eff["github-comments"]
+    source = eff["source"]["github-comments"]
+    lines = [
+        f"workflow: {workflow_name}",
+        f"github-comments.enabled: {gh.get('enabled')} (source: {source})",
+        f"github-comments.mode: {gh.get('mode')}",
+        f"github-comments.include-events: {gh.get('include-events') or '(all)'}",
+        f"github-comments.suppress-transient-failures: {gh.get('suppress-transient-failures')}",
+    ]
+    return "\n".join(lines)
+
+
 def configure_subcommands(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="daedalus_command")
     sub.required = True
@@ -1288,6 +1362,23 @@ def configure_subcommands(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     watch_cmd.add_argument("--once", action="store_true", help="Render one frame and exit (default when stdout is not a TTY).")
     watch_cmd.add_argument("--interval", type=float, default=2.0, help="Poll interval in live mode.")
     watch_cmd.set_defaults(handler=_lazy_cmd_watch, func=run_cli_command)
+
+    set_obs_cmd = sub.add_parser(
+        "set-observability",
+        help="Override observability config for a workflow (writes runtime override file).",
+    )
+    set_obs_cmd.add_argument("--workflow-root", type=Path, default=DEFAULT_WORKFLOW_ROOT)
+    set_obs_cmd.add_argument("--workflow", required=True, help="Workflow name (e.g. code-review)")
+    set_obs_cmd.add_argument("--github-comments", choices=["on", "off", "unset"], required=True)
+    set_obs_cmd.set_defaults(handler=cmd_set_observability, func=run_cli_command)
+
+    get_obs_cmd = sub.add_parser(
+        "get-observability",
+        help="Show effective observability config + which layer (default/yaml/override) won.",
+    )
+    get_obs_cmd.add_argument("--workflow-root", type=Path, default=DEFAULT_WORKFLOW_ROOT)
+    get_obs_cmd.add_argument("--workflow", required=True)
+    get_obs_cmd.set_defaults(handler=cmd_get_observability, func=run_cli_command)
 
     return parser
 
