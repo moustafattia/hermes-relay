@@ -221,4 +221,56 @@ def format_panel(
 
 
 # ─── Per-command formatters ────────────────────────────────────────
-# Implemented in subsequent tasks (status / doctor / active-gate-status / ...).
+
+
+# ─── /daedalus status ────────────────────────────────────────
+
+def format_status(
+    result: Mapping[str, Any],
+    *,
+    use_color: bool | None = None,
+    now_iso: str | None = None,
+) -> str:
+    runtime_state = result.get("runtime_status") or EMPTY_VALUE
+    mode = result.get("current_mode")
+    if mode:
+        state_value = f"{runtime_state} ({mode} mode)"
+    else:
+        state_value = runtime_state
+
+    schema_version = result.get("schema_version")
+    schema_value = f"v{schema_version}" if schema_version else EMPTY_VALUE
+
+    owner = result.get("active_orchestrator_instance_id") or EMPTY_VALUE
+    lane_count = result.get("lane_count")
+    lanes_str = str(lane_count) if lane_count is not None else EMPTY_VALUE
+
+    instance_label = result.get("instance_id") or result.get("workflow_root_name") or "yoyopod"
+
+    # Build sections
+    top_rows = [
+        Row(label="state",  value=state_value),
+        Row(label="owner",  value=owner),
+        Row(label="schema", value=schema_value),
+    ]
+
+    paths_rows = [
+        Row(label="db",     value=format_path(result.get("db_path"))),
+        Row(label="events", value=format_path(result.get("event_log_path"))),
+    ]
+
+    heartbeat_value = format_timestamp(result.get("latest_heartbeat_at") or "", now_iso=now_iso)
+    heartbeat_rows = [Row(label="last", value=heartbeat_value)]
+
+    lanes_rows = [Row(label="total", value=lanes_str)]
+
+    return format_panel(
+        title=f"Daedalus runtime — {instance_label}",
+        sections=[
+            Section(name=None,        rows=top_rows),
+            Section(name="paths",     rows=paths_rows),
+            Section(name="heartbeat", rows=heartbeat_rows),
+            Section(name="lanes",     rows=lanes_rows),
+        ],
+        use_color=use_color,
+    )

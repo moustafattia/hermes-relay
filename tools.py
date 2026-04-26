@@ -1549,10 +1549,16 @@ def render_result(
             f"mode={result.get('mode')}"
         )
     if command == "status":
-        return (
-            f"runtime={result.get('runtime_status')} mode={result.get('current_mode')} "
-            f"owner={result.get('active_orchestrator_instance_id')} lanes={result.get('lane_count')}"
-        )
+        try:
+            from formatters import format_status as _fmt_status
+        except ImportError:
+            spec = importlib.util.spec_from_file_location(
+                "daedalus_formatters_for_render", PLUGIN_DIR / "formatters.py"
+            )
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            _fmt_status = mod.format_status
+        return _fmt_status(result)
     if command == "shadow-report":
         runtime = result.get("runtime") or {}
         heartbeat = result.get("heartbeat") or {}
