@@ -1560,56 +1560,16 @@ def render_result(
             _fmt_status = mod.format_status
         return _fmt_status(result)
     if command == "shadow-report":
-        runtime = result.get("runtime") or {}
-        heartbeat = result.get("heartbeat") or {}
-        service = result.get("service") or {}
-        owner_summary = result.get("owner_summary") or {}
-        lane = result.get("active_lane") or {}
-        legacy = result.get("legacy") or {}
-        relay = result.get("relay") or {}
-        recent_actions = result.get("recent_shadow_actions") or []
-        warnings = result.get("warnings") or []
-        lines = [
-            "shadow-report",
-            f"runtime: {runtime.get('runtime_status')} mode={runtime.get('current_mode')} owner={runtime.get('active_orchestrator_instance_id')}",
-            f"heartbeat: {runtime.get('latest_heartbeat_at')} age={heartbeat.get('heartbeat_age_seconds')}s expires={heartbeat.get('expires_at')}",
-        ]
-        if service:
-            lines.append(
-                f"service: {service.get('service_mode')} installed={service.get('installed')} enabled={service.get('enabled')} active={service.get('active')}"
+        try:
+            from formatters import format_shadow_report as _fmt
+        except ImportError:
+            spec = importlib.util.spec_from_file_location(
+                "daedalus_formatters_for_shadow", PLUGIN_DIR / "formatters.py"
             )
-        if owner_summary:
-            lines.append(
-                f"owner summary: primary={owner_summary.get('primary_owner')} relay_primary={owner_summary.get('relay_primary')} "
-                f"active_execution_enabled={owner_summary.get('active_execution_enabled')} gate_allowed={owner_summary.get('gate_allowed')}"
-            )
-        lines.extend([
-            f"live lane: issue={lane.get('issue_number')} lane={lane.get('lane_id')} state={lane.get('workflow_state')}/{lane.get('review_state')}/{lane.get('merge_state')}",
-            f"legacy next: {legacy.get('next_action_type')} reason={legacy.get('reason')}",
-            f"relay next: {relay.get('derived_action_type')} reason={relay.get('reason')}",
-            f"compatible: {relay.get('compatible')}",
-        ])
-        if warnings:
-            lines.append("warnings:")
-            for warning in warnings:
-                lines.append(f"- {warning}")
-        if recent_actions:
-            lines.append("recent shadow actions:")
-            for action in recent_actions:
-                lines.append(
-                    f"- {action.get('requested_at')} issue={action.get('issue_number')} lane={action.get('lane_id')} {action.get('action_type')} status={action.get('status')}"
-                )
-        recent_failures = result.get("recent_failures") or []
-        if recent_failures:
-            lines.append("recent failures:")
-            for failure in recent_failures:
-                lines.append(
-                    f"- {failure.get('detected_at')} issue={failure.get('issue_number')} lane={failure.get('lane_id')} "
-                    f"class={failure.get('failure_class')} recommended={failure.get('analyst_recommended_action')} "
-                    f"confidence={failure.get('analyst_confidence')} recovery={failure.get('recovery_state')} "
-                    f"urgency={failure.get('urgency')} age={failure.get('failure_age_seconds')}s"
-                )
-        return "\n".join(lines)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            _fmt = mod.format_shadow_report
+        return _fmt(result)
     if command == "doctor":
         try:
             from formatters import format_doctor as _fmt

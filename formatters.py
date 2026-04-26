@@ -429,3 +429,94 @@ def format_doctor(
         sections=[summary_section, checks_section],
         use_color=use_color,
     )
+
+
+# ─── /daedalus shadow-report ────────────────────────────────────────
+
+def format_shadow_report(
+    result: Mapping[str, Any],
+    *,
+    use_color: bool | None = None,
+    now_iso: str | None = None,
+) -> str:
+    runtime = result.get("runtime") or {}
+    heartbeat = result.get("heartbeat") or {}
+    service = result.get("service") or {}
+    owner_summary = result.get("owner_summary") or {}
+    active_lane = result.get("active_lane") or {}
+    legacy = result.get("legacy") or {}
+    relay = result.get("relay") or {}
+    warnings = result.get("warnings") or []
+    recent_actions = result.get("recent_shadow_actions") or []
+    recent_failures = result.get("recent_failures") or []
+
+    sections: list[Section] = []
+
+    # Runtime
+    sections.append(Section(name="runtime", rows=[
+        Row(label="state",     value=f"{runtime.get('runtime_status') or '?'} ({runtime.get('current_mode') or '?'} mode)"),
+        Row(label="owner",     value=runtime.get("active_orchestrator_instance_id") or EMPTY_VALUE),
+        Row(label="heartbeat", value=format_timestamp(runtime.get("latest_heartbeat_at") or "", now_iso=now_iso)),
+    ]))
+
+    # Service (when present)
+    if service:
+        sections.append(Section(name="service", rows=[
+            Row(label="mode",      value=str(service.get("service_mode") or EMPTY_VALUE)),
+            Row(label="installed", value=render_bool(service.get("installed"))),
+            Row(label="enabled",   value=render_bool(service.get("enabled"))),
+            Row(label="active",    value=render_bool(service.get("active"))),
+        ]))
+
+    # Active lane
+    if active_lane.get("issue_number") is not None:
+        sections.append(Section(name="active lane", rows=[
+            Row(label="issue",   value=f"#{active_lane.get('issue_number')}"),
+            Row(label="lane id", value=str(active_lane.get("lane_id") or EMPTY_VALUE)),
+            Row(label="state",   value=f"{active_lane.get('workflow_state') or '?'} / "
+                                          f"{active_lane.get('review_state') or '?'} / "
+                                          f"{active_lane.get('merge_state') or '?'}"),
+        ]))
+
+    # Decisions: legacy vs relay
+    sections.append(Section(name="next action", rows=[
+        Row(label="legacy",     value=f"{legacy.get('next_action_type') or EMPTY_VALUE}",
+            detail=legacy.get("reason") or None),
+        Row(label="relay",      value=f"{relay.get('derived_action_type') or EMPTY_VALUE}",
+            detail=relay.get("reason") or None),
+        Row(label="compatible", value=render_bool(relay.get("compatible")),
+            status=("pass" if relay.get("compatible") else "warn")),
+    ]))
+
+    # Warnings (if any)
+    if warnings:
+        sections.append(Section(name="warnings",
+                                rows=[Row(label="", value=f"⚠ {w}", status="warn") for w in warnings]))
+
+    # Recent actions (compact)
+    if recent_actions:
+        rows = []
+        for action in recent_actions[:5]:
+            rows.append(Row(
+                label=str(action.get("requested_at") or "?")[:19],
+                value=f"#{action.get('issue_number')} {action.get('action_type')} → {action.get('status')}",
+            ))
+        sections.append(Section(name="recent shadow actions", rows=rows))
+
+    # Recent failures (compact)
+    if recent_failures:
+        rows = []
+        for failure in recent_failures[:5]:
+            rows.append(Row(
+                label=str(failure.get("detected_at") or "?")[:19],
+                value=f"#{failure.get('issue_number')} class={failure.get('failure_class')} "
+                      f"recovery={failure.get('recovery_state')}",
+                status="fail",
+            ))
+        sections.append(Section(name="recent failures", rows=rows))
+
+    return format_panel(
+        title="Daedalus shadow-report",
+        sections=sections,
+        use_color=use_color,
+    )
