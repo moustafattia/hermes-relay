@@ -520,3 +520,43 @@ def format_shadow_report(
         sections=sections,
         use_color=use_color,
     )
+
+
+# ─── /daedalus service-status ────────────────────────────────────────
+
+def format_service_status(
+    result: Mapping[str, Any],
+    *,
+    use_color: bool | None = None,
+) -> str:
+    name = result.get("service_name") or EMPTY_VALUE
+    mode = result.get("service_mode") or "?"
+    props = result.get("properties") or {}
+
+    identity = Section(name=None, rows=[
+        Row(label="service", value=name),
+        Row(label="mode",    value=str(mode)),
+    ])
+
+    install = Section(name="install state", rows=[
+        Row(label="installed", value=render_bool(result.get("installed")),
+            status=("pass" if result.get("installed") else "warn")),
+        Row(label="enabled",   value=render_bool(result.get("enabled")),
+            status=("pass" if result.get("enabled") else "warn")),
+        Row(label="active",    value=render_bool(result.get("active")),
+            status=("pass" if result.get("active") else "warn")),
+    ])
+
+    runtime = Section(name="runtime", rows=[
+        Row(label="pid", value=str(props.get("ExecMainPID") or "") or EMPTY_VALUE),
+    ])
+
+    paths = Section(name="paths", rows=[
+        Row(label="unit", value=format_path(props.get("FragmentPath") or result.get("unit_path"))),
+    ])
+
+    return format_panel(
+        title="Daedalus service",
+        sections=[identity, install, runtime, paths],
+        use_color=use_color,
+    )

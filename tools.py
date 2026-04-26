@@ -1588,11 +1588,16 @@ def render_result(
     if command in {"service-start", "service-stop", "service-restart", "service-enable", "service-disable"}:
         return f"{result.get('action')} mode={result.get('service_mode')} {result.get('service_name')} ok={result.get('ok')} stdout={result.get('stdout')} stderr={result.get('stderr')}".strip()
     if command == "service-status":
-        props = result.get("properties") or {}
-        return (
-            f"service={result.get('service_name')} mode={result.get('service_mode')} installed={result.get('installed')} enabled={result.get('enabled')} "
-            f"active={result.get('active')} pid={props.get('ExecMainPID')} file={props.get('FragmentPath') or result.get('unit_path')}"
-        )
+        try:
+            from formatters import format_service_status as _fmt
+        except ImportError:
+            spec = importlib.util.spec_from_file_location(
+                "daedalus_formatters_for_service_status", PLUGIN_DIR / "formatters.py"
+            )
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            _fmt = mod.format_service_status
+        return _fmt(result)
     if command == "service-logs":
         output = result.get("stdout") or result.get("stderr") or ""
         return output if output else f"no logs for {result.get('service_name')}"
