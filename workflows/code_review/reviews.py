@@ -751,10 +751,13 @@ def fetch_codex_pr_body_signal(
         )
     except Exception:
         return None
+    if not isinstance(reactions, list):
+        return None
     matches = [
         reaction
         for reaction in reactions
-        if (reaction.get("user") or {}).get("login") in codex_bot_logins
+        if isinstance(reaction, dict)
+        and (reaction.get("user") or {}).get("login") in codex_bot_logins
         and reaction.get("content") in (clean_reactions | pending_reactions)
     ]
     if not matches:
@@ -823,8 +826,8 @@ def fetch_codex_cloud_review(
             "api",
             "graphql",
             "-f",
-            "query=query { repository(owner:\"%s\", name:\"%s\") { pullRequest(number: %d) { state headRefOid reviewThreads(first: 100) { nodes { id isResolved isOutdated path line comments(first: 20) { nodes { author { login } body url createdAt } } } } } } }"
-            % (owner, name, pr_number),
+            "query=# repo:%s\nquery { repository(owner:\"%s\", name:\"%s\") { pullRequest(number: %d) { state headRefOid reviewThreads(first: 100) { nodes { id isResolved isOutdated path line comments(first: 20) { nodes { author { login } body url createdAt } } } } } } }"
+            % (repo_slug, owner, name, pr_number),
         ],
         cwd=cwd,
     )
