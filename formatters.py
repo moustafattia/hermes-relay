@@ -409,6 +409,7 @@ def format_doctor(
                     f"action={failure.get('recommended_action')} "
                     f"confidence={failure.get('confidence')} "
                     f"recovery={failure.get('recovery_state')} "
+                    f"urgency={failure.get('urgency')} "
                     f"age={failure.get('failure_age_seconds')}s"
                 )
                 rows.append(Row(label="", value=detail_text, status=None))
@@ -514,7 +515,7 @@ def format_shadow_report(
     # Recent actions (compact)
     if recent_actions:
         rows = []
-        for action in recent_actions[:5]:
+        for action in recent_actions:
             rows.append(Row(
                 label=str(action.get("requested_at") or "?")[:19],
                 value=f"#{action.get('issue_number')} {action.get('action_type')} → {action.get('status')}",
@@ -524,7 +525,7 @@ def format_shadow_report(
     # Recent failures (compact)
     if recent_failures:
         rows = []
-        for failure in recent_failures[:5]:
+        for failure in recent_failures:
             rows.append(Row(
                 label=str(failure.get("detected_at") or "?")[:19],
                 value=f"#{failure.get('issue_number')} class={failure.get('failure_class')} "

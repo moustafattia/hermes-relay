@@ -66,3 +66,32 @@ def test_shadow_report_no_raw_python_bools():
     out = fmt.format_shadow_report(_example_shadow_report(), use_color=False)
     assert " True" not in out
     assert " False" not in out
+
+
+def test_shadow_report_renders_all_recent_actions_beyond_legacy_5_cap():
+    """P6.1: text rendering must respect upstream --recent-actions-limit
+    (already applied in build_shadow_report). Previously a hard-coded [:5]
+    in the formatter silently truncated text output for N > 5."""
+    fmt = _fmt()
+    rep = _example_shadow_report()
+    rep["recent_shadow_actions"] = [
+        {"requested_at": f"2026-04-26T22:00:{i:02d}Z",
+         "issue_number": 100 + i,
+         "action_type": "publish_pr",
+         "status": "ok"}
+        for i in range(10)
+    ]
+    rep["recent_failures"] = [
+        {"detected_at": f"2026-04-26T22:01:{i:02d}Z",
+         "issue_number": 200 + i,
+         "failure_class": "subprocess_error",
+         "recovery_state": "queued"}
+        for i in range(10)
+    ]
+    out = fmt.format_shadow_report(rep, use_color=False)
+    # All 10 actions present (issue numbers 100..109)
+    for i in range(10):
+        assert f"#{100 + i}" in out, f"missing action issue #{100 + i} in output"
+    # All 10 failures present (issue numbers 200..209)
+    for i in range(10):
+        assert f"#{200 + i}" in out, f"missing failure issue #{200 + i} in output"

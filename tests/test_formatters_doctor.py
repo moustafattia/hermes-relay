@@ -78,6 +78,9 @@ def test_doctor_failure_details_rendered_inline():
     assert "f-123" in out
     assert "subprocess_error" in out
     assert "retry" in out
+    # Urgency must be preserved in inline details so operators can triage
+    # critical vs warning failures from text output (P6.2 regression).
+    assert "urgency=high" in out
 
 
 def test_doctor_no_raw_python_bools():
