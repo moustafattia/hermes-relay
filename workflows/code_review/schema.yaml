@@ -70,8 +70,21 @@ properties:
         properties:
           enabled: {type: boolean}
           name: {type: string}
+          kind:
+            type: string
+            enum: [github-comments, disabled]
           provider: {type: string}
           cache-seconds: {type: integer}
+          repo-slug: {type: string}
+          logins:
+            type: array
+            items: {type: string}
+          clean-reactions:
+            type: array
+            items: {type: string}
+          pending-reactions:
+            type: array
+            items: {type: string}
       advisory-reviewer:
         type: object
         required: [enabled, name]
