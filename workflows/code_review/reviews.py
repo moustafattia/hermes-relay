@@ -7,6 +7,8 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Callable
 
+from workflows.code_review.migrations import get_review
+
 
 """YoYoPod Core review-policy helpers.
 
@@ -204,7 +206,7 @@ def classify_lane_failure(
     }
     if reason in session_failure_map:
         return {"failureClass": session_failure_map[reason], "detail": reason}
-    claude_review = reviews.get("claudeCode") or {}
+    claude_review = get_review(reviews, "internalReview")
     if claude_review.get("status") in {"failed", "timed_out"}:
         detail = claude_review.get("failureClass") or claude_review.get("status")
         return {"failureClass": f"claude_review_{claude_review.get('status')}", "detail": detail}
@@ -1348,7 +1350,7 @@ def maybe_dispatch_repair_handoff(
     claude_decision = should_dispatch_claude_repair_handoff(
         lane_state=lane_state,
         session_action=session_action,
-        claude_review=reviews.get("claudeCode"),
+        claude_review=get_review(reviews, "internalReview"),
         repair_brief=repair_brief,
         workflow_state=workflow_state,
         current_head_sha=impl.get("localHeadSha"),
@@ -1358,7 +1360,7 @@ def maybe_dispatch_repair_handoff(
         repair_payload = build_claude_repair_handoff_payload(
             session_action=session_action,
             issue=issue,
-            claude_review=reviews.get("claudeCode"),
+            claude_review=get_review(reviews, "internalReview"),
             repair_brief=repair_brief,
             lane_memo_path=lane_memo_path_str,
             lane_state_path=lane_state_path_str,
@@ -1366,7 +1368,7 @@ def maybe_dispatch_repair_handoff(
         )
         repair_prompt = render_claude_repair_handoff_prompt(
             issue=issue,
-            claude_review=reviews.get("claudeCode"),
+            claude_review=get_review(reviews, "internalReview"),
             repair_brief=repair_brief,
             lane_memo_path=lane_memo_path_obj,
             lane_state_path=lane_state_path_obj,
@@ -1494,7 +1496,7 @@ def build_reviews_block(
     using adapter-owned review normalizers. ``claude_seed_fn`` is optional; if
     not provided, a minimal pre-publish seed with the given model is used.
     """
-    existing_claude_review = existing_reviews.get("claudeCode")
+    existing_claude_review = get_review(existing_reviews, "internalReview")
     if publish_ready:
         return {
             "rockClaw": normalize_review(

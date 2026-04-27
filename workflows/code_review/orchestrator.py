@@ -4,6 +4,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+from workflows.code_review.migrations import get_review
+
 
 """YoYoPod Core workflow orchestration (read-model + reconcile).
 
@@ -145,7 +147,7 @@ def build_status_raw(workspace: Any) -> dict[str, Any]:
     ledger_idle = ledger.get("workflowIdle")
 
     local_candidate_exists = ws._has_local_candidate(local_head_sha, worktree_commits_ahead)
-    existing_claude_review = existing_reviews.get("claudeCode")
+    existing_claude_review = get_review(existing_reviews, "internalReview")
     single_pass_claude_gate_satisfied = ws._single_pass_local_claude_gate_satisfied(existing_claude_review, local_head_sha, lane_state)
     effective_workflow_state = ledger_state
     effective_review_state = ledger.get("reviewState")
@@ -182,7 +184,7 @@ def build_status_raw(workspace: Any) -> dict[str, Any]:
         open_pr=open_pr,
         workflow_state=effective_workflow_state,
         pr_ledger=ledger.get("pr") or {},
-        inter_review_agent_review=reviews["claudeCode"],
+        inter_review_agent_review=get_review(reviews, "internalReview"),
         inter_review_agent_job=ws._summarize_job(job_map.get(ws.WORKFLOW_WATCHDOG_JOB_NAME)),
         local_head_sha=local_head_sha,
         implementation_commits_ahead=worktree_commits_ahead,
@@ -190,7 +192,7 @@ def build_status_raw(workspace: Any) -> dict[str, Any]:
     )
     if (
         ws.INTER_REVIEW_AGENT_FREEZE_CODER_WHILE_RUNNING
-        and ws._inter_review_agent_is_running_on_head(reviews.get("claudeCode"), local_head_sha)
+        and ws._inter_review_agent_is_running_on_head(get_review(reviews, "internalReview"), local_head_sha)
     ):
         session_action_recommendation = {
             "action": "no-action",
@@ -337,7 +339,7 @@ def reconcile(workspace: Any, *, write_health: bool = True, fix_watchers: bool =
     status = ws.build_status()
     ledger = ws.load_ledger()
     previous_workflow_state = ledger.get("workflowState") or "unknown"
-    previous_claude_review = ((ledger.get("reviews") or {}).get("claudeCode") or {}).copy()
+    previous_claude_review = get_review(ledger.get("reviews"), "internalReview").copy()
     jobs_payload = ws.load_jobs()
     changed = {"ledger": False, "jobs": False}
 
@@ -361,8 +363,8 @@ def reconcile(workspace: Any, *, write_health: bool = True, fix_watchers: bool =
     if (
         open_pr
         and open_pr.get("isDraft")
-        and ws._current_inter_review_agent_matches_local_head(reviews.get("claudeCode"), impl.get("localHeadSha"))
-        and (reviews.get("claudeCode") or {}).get("verdict") == "PASS_CLEAN"
+        and ws._current_inter_review_agent_matches_local_head(get_review(reviews, "internalReview"), impl.get("localHeadSha"))
+        and get_review(reviews, "internalReview").get("verdict") == "PASS_CLEAN"
         and ws._mark_pr_ready_for_review(open_pr.get("number"))
     ):
         ws.audit("reconcile", "Marked draft PR ready for review after clean pre-publish Claude gate", prNumber=open_pr.get("number"), headSha=impl.get("localHeadSha"))
@@ -403,7 +405,7 @@ def reconcile(workspace: Any, *, write_health: bool = True, fix_watchers: bool =
         actor_labels=ws._actor_labels_payload(codex_model),
         reviews=reviews,
     )
-    ws._audit_inter_review_agent_transition(previous_claude_review, reviews["claudeCode"])
+    ws._audit_inter_review_agent_transition(previous_claude_review, get_review(reviews, "internalReview"))
     adapter_status.apply_ledger_implementation_merge(
         ledger,
         active_lane=active_lane,

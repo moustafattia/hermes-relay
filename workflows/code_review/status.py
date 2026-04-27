@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from workflows.code_review.health import compute_health, compute_stale_lane_reasons
+from workflows.code_review.migrations import get_review
 from workflows.code_review.paths import (
     lane_memo_path,
     lane_state_path,
@@ -437,7 +438,7 @@ def assemble_status_payload(
             "sessionNudge": ledger.get("sessionNudge"),
             "repairBrief": effective_repair_brief,
             "codexModel": implementation.get("codexModel") or preferred_codex_model or (ledger.get("implementation") or {}).get("codexModel"),
-            "claudeModel": ledger.get("claudeModel") or ledger.get("interReviewAgentModel") or ((reviews.get("claudeCode") or {}).get("model")) or inter_review_agent_model,
+            "claudeModel": ledger.get("claudeModel") or ledger.get("interReviewAgentModel") or (get_review(reviews, "internalReview").get("model")) or inter_review_agent_model,
             "interReviewAgentModel": ledger.get("interReviewAgentModel") or ledger.get("claudeModel") or ((reviews.get("claudeCode") or {}).get("model")) or inter_review_agent_model,
             "workflowActors": ledger.get("workflowActors") or actor_labels,
         },
