@@ -1563,8 +1563,8 @@ def _install_wrapper_adapter_shims(ns: SimpleNamespace) -> None:
             has_open_pr=has_open_pr,
         )
 
-    def should_dispatch_codex_cloud_repair_handoff(*, lane_state, session_action, codex_review, repair_brief, workflow_state, current_head_sha, has_open_pr):
-        return ns._load_adapter_reviews_module().should_dispatch_codex_cloud_repair_handoff(
+    def should_dispatch_external_review_repair_handoff(*, lane_state, session_action, codex_review, repair_brief, workflow_state, current_head_sha, has_open_pr):
+        return ns._load_adapter_reviews_module().should_dispatch_external_review_repair_handoff(
             lane_state=lane_state,
             session_action=session_action,
             codex_review=codex_review,
@@ -1574,8 +1574,8 @@ def _install_wrapper_adapter_shims(ns: SimpleNamespace) -> None:
             has_open_pr=has_open_pr,
         )
 
-    def build_codex_cloud_repair_handoff_payload(*, session_action, issue, codex_review, repair_brief, lane_memo_path, lane_state_path, now_iso):
-        return ns._load_adapter_reviews_module().build_codex_cloud_repair_handoff_payload(
+    def build_external_review_repair_handoff_payload(*, session_action, issue, codex_review, repair_brief, lane_memo_path, lane_state_path, now_iso):
+        return ns._load_adapter_reviews_module().build_external_review_repair_handoff_payload(
             session_action=session_action,
             issue=issue,
             codex_review=codex_review,
@@ -1585,8 +1585,8 @@ def _install_wrapper_adapter_shims(ns: SimpleNamespace) -> None:
             now_iso=now_iso,
         )
 
-    def record_codex_cloud_repair_handoff(*, worktree, payload):
-        return ns._load_adapter_reviews_module().record_codex_cloud_repair_handoff(
+    def record_external_review_repair_handoff(*, worktree, payload):
+        return ns._load_adapter_reviews_module().record_external_review_repair_handoff(
             worktree=worktree,
             payload=payload,
             lane_state_path_fn=ns._lane_state_path,
@@ -1594,7 +1594,7 @@ def _install_wrapper_adapter_shims(ns: SimpleNamespace) -> None:
             write_json_fn=ns._write_json,
         )
 
-    def _render_codex_cloud_repair_handoff_prompt(*, issue, codex_review, repair_brief, lane_memo_path, lane_state_path, pr_url):
+    def _render_external_review_repair_handoff_prompt(*, issue, codex_review, repair_brief, lane_memo_path, lane_state_path, pr_url):
         return ns._load_adapter_prompts_module().render_external_reviewer_repair_handoff_prompt(
             issue=issue,
             codex_review=codex_review,

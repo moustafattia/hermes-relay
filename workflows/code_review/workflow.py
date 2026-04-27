@@ -7,7 +7,7 @@ from workflows.code_review.reviews import (
     has_local_candidate,
     inter_review_agent_is_running_on_head,
     should_dispatch_claude_repair_handoff,
-    should_dispatch_codex_cloud_repair_handoff,
+    should_dispatch_external_review_repair_handoff,
 )
 
 
@@ -190,7 +190,7 @@ def derive_next_action(
             "headSha": local_head_sha,
         }
 
-    if should_dispatch_codex_cloud_repair_handoff(
+    if should_dispatch_external_review_repair_handoff(
         lane_state=lane_state,
         session_action=session_action,
         codex_review=codex_review,
