@@ -305,7 +305,7 @@ def single_pass_local_claude_gate_satisfied(
     state_review = state.get("review") or {}
     review_count = local_inter_review_agent_review_count(review, state)
     latest_reviewed_head = state_review.get("lastClaudeReviewedHeadSha")
-    latest_verdict = state_review.get("lastInternalVerdict") or state_review.get("lastClaudeVerdict")
+    latest_verdict = state_review.get("lastInternalVerdict")
     if review.get("reviewScope") == "local-prepublish" and review.get("status") == "completed":
         latest_reviewed_head = review.get("reviewedHeadSha") or latest_reviewed_head
         latest_verdict = review.get("verdict") or latest_verdict

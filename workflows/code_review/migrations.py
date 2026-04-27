@@ -100,8 +100,6 @@ LEDGER_KEY_RENAMES: dict[str, str] = {
     "lastClaudeVerdict": "lastInternalVerdict",
 }
 
-_LEGACY_LEDGER_KEY_FOR: dict[str, str] = {v: k for k, v in LEDGER_KEY_RENAMES.items()}
-
 # Top-level keys that are dropped entirely (no rename target).
 # claudeModel is canonicalized as internalReviewerModel via the
 # interReviewAgentModel migration; the explicit claudeModel mirror
@@ -131,11 +129,5 @@ def migrate_top_level_keys(ledger: dict) -> tuple[dict, bool]:
 
 
 def get_ledger_field(ledger: dict | None, new_key: str):
-    """Read a top-level ledger field by its new key; fall back to legacy."""
-    ledger = ledger or {}
-    if new_key in ledger:
-        return ledger[new_key]
-    legacy = _LEGACY_LEDGER_KEY_FOR.get(new_key)
-    if legacy and legacy in ledger:
-        return ledger[legacy]
-    return None
+    """Read a top-level ledger field. Returns None if absent."""
+    return (ledger or {}).get(new_key)

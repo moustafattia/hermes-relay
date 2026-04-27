@@ -87,12 +87,6 @@ def test_get_ledger_field_returns_new_when_present():
     assert get_ledger_field({"internalReviewerModel": "x"}, "internalReviewerModel") == "x"
 
 
-def test_get_ledger_field_falls_back_to_legacy():
-    from workflows.code_review.migrations import get_ledger_field
-    assert get_ledger_field({"interReviewAgentModel": "x"}, "internalReviewerModel") == "x"
-    assert get_ledger_field({"claudeRepairHandoff": {"v": 1}}, "internalReviewRepairHandoff") == {"v": 1}
-
-
 def test_get_ledger_field_returns_none_for_unknown_key():
     from workflows.code_review.migrations import get_ledger_field
     assert get_ledger_field({"x": 1}, "made-up") is None

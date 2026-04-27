@@ -31,3 +31,26 @@ def test_build_external_review_thread_uses_externalReview_source():
         pr_signal=None, signal_epoch=None, comment_epoch=None,
     )
     assert out["source"] == "externalReview"
+
+
+def test_get_ledger_field_no_legacy_fallback():
+    """D-3 fallback to legacy keys is dropped after D-4."""
+    from workflows.code_review.migrations import get_ledger_field
+    assert get_ledger_field({"interReviewAgentModel": "x"}, "internalReviewerModel") is None
+    assert get_ledger_field({"claudeRepairHandoff": {"v": 1}}, "internalReviewRepairHandoff") is None
+
+
+def test_reviews_no_lastClaudeVerdict_fallback():
+    """reviews.py:308 should read only the new key after D-4."""
+    from pathlib import Path
+    src = (Path(__file__).resolve().parent.parent / "workflows/code_review/reviews.py").read_text()
+    # The fallback `or state_review.get("lastClaudeVerdict")` should be gone.
+    assert 'state_review.get("lastClaudeVerdict")' not in src
+
+
+def test_workspace_no_interReviewAgentModel_fallback():
+    """workspace.py review_policy fallback should not include the legacy key after D-4."""
+    from pathlib import Path
+    src = (Path(__file__).resolve().parent.parent / "workflows/code_review/workspace.py").read_text()
+    # The fallback `or review_policy.get("interReviewAgentModel")` should be gone.
+    assert 'review_policy.get("interReviewAgentModel")' not in src
