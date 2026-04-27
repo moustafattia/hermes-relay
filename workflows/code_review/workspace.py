@@ -10,6 +10,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+from workflows.code_review.migrations import get_ledger_field
 from workflows.code_review.runtimes import build_runtimes
 
 
@@ -123,7 +124,7 @@ def _yaml_to_legacy_view(yaml_cfg: dict, workspace_root: "Path | None" = None) -
         },
         "reviewPolicy": {
             "interReviewAgentPassWithFindingsReviews": internal_review_gate.get("pass-with-findings-tolerance", 1),
-            "interReviewAgentModel": int_reviewer.get("model", "claude-sonnet-4-6"),
+            "internalReviewerModel": int_reviewer.get("model", "claude-sonnet-4-6"),
             "interReviewAgentMaxTurns": claude_cli.get("max-turns-per-invocation", 24),
             "interReviewAgentTimeoutSeconds": claude_cli.get("timeout-seconds", 1200),
             "freezeCoderWhileInterReviewAgentRunning": int_reviewer.get("freeze-coder-while-running", True),
@@ -499,9 +500,9 @@ def make_workspace(*, workspace_root: Path, config: dict[str, Any]) -> SimpleNam
         or review_policy.get("claudePassWithFindingsReviews", 1)
     )
     inter_review_agent_model = str(
-        review_policy.get("interReviewAgentModel")
-        or review_policy.get("internalReviewerAgentModel")
-        or review_policy.get("claudeModel", "claude-sonnet-4-6")
+        review_policy.get("internalReviewerModel")
+        or review_policy.get("interReviewAgentModel")
+        or "claude-sonnet-4-6"
     )
     inter_review_agent_max_turns = int(
         review_policy.get("interReviewAgentMaxTurns")
@@ -1562,8 +1563,8 @@ def _install_wrapper_adapter_shims(ns: SimpleNamespace) -> None:
             has_open_pr=has_open_pr,
         )
 
-    def should_dispatch_codex_cloud_repair_handoff(*, lane_state, session_action, codex_review, repair_brief, workflow_state, current_head_sha, has_open_pr):
-        return ns._load_adapter_reviews_module().should_dispatch_codex_cloud_repair_handoff(
+    def should_dispatch_external_review_repair_handoff(*, lane_state, session_action, codex_review, repair_brief, workflow_state, current_head_sha, has_open_pr):
+        return ns._load_adapter_reviews_module().should_dispatch_external_review_repair_handoff(
             lane_state=lane_state,
             session_action=session_action,
             codex_review=codex_review,
@@ -1573,8 +1574,8 @@ def _install_wrapper_adapter_shims(ns: SimpleNamespace) -> None:
             has_open_pr=has_open_pr,
         )
 
-    def build_codex_cloud_repair_handoff_payload(*, session_action, issue, codex_review, repair_brief, lane_memo_path, lane_state_path, now_iso):
-        return ns._load_adapter_reviews_module().build_codex_cloud_repair_handoff_payload(
+    def build_external_review_repair_handoff_payload(*, session_action, issue, codex_review, repair_brief, lane_memo_path, lane_state_path, now_iso):
+        return ns._load_adapter_reviews_module().build_external_review_repair_handoff_payload(
             session_action=session_action,
             issue=issue,
             codex_review=codex_review,
@@ -1584,8 +1585,8 @@ def _install_wrapper_adapter_shims(ns: SimpleNamespace) -> None:
             now_iso=now_iso,
         )
 
-    def record_codex_cloud_repair_handoff(*, worktree, payload):
-        return ns._load_adapter_reviews_module().record_codex_cloud_repair_handoff(
+    def record_external_review_repair_handoff(*, worktree, payload):
+        return ns._load_adapter_reviews_module().record_external_review_repair_handoff(
             worktree=worktree,
             payload=payload,
             lane_state_path_fn=ns._lane_state_path,
@@ -1593,7 +1594,7 @@ def _install_wrapper_adapter_shims(ns: SimpleNamespace) -> None:
             write_json_fn=ns._write_json,
         )
 
-    def _render_codex_cloud_repair_handoff_prompt(*, issue, codex_review, repair_brief, lane_memo_path, lane_state_path, pr_url):
+    def _render_external_review_repair_handoff_prompt(*, issue, codex_review, repair_brief, lane_memo_path, lane_state_path, pr_url):
         return ns._load_adapter_prompts_module().render_external_reviewer_repair_handoff_prompt(
             issue=issue,
             codex_review=codex_review,

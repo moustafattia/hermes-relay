@@ -227,7 +227,7 @@ Phase 1 session-preservation policy:
 - draft PRs must be represented honestly as `codexCloud.status=not_started`, not pending
 - Claude pre-publish review policy is configurable via `reviewPolicy.claudePassWithFindingsReviews` in `config/yoyopod-workflow.json`
 - Claude review model selection should also live in `config/yoyopod-workflow.json` under `reviewPolicy.claudeModel` (currently pinned to `claude-sonnet-4-6`), and wrapper-owned local review execution should pass it explicitly via `claude --model <id> --permission-mode bypassPermissions --print ...`
-- the configured Claude model should be visible in workflow truth surfaces: `status --json -> reviews.claudeCode.model`, `status --json -> ledger.claudeModel`, persisted top-level ledger field `ledger.claudeModel`, and persisted review field `ledger.reviews.claudeCode.model`
+- the configured Claude model should be visible in workflow truth surfaces: `status --json -> reviews.claudeCode.model`, `status --json -> ledger.internalReviewerModel`, and persisted review field `ledger.reviews.internalReview.model` (the top-level `ledger.claudeModel` field has been dropped in Phase D-3)
 - current intended semantics:
   - `REWORK` always forces Codex repair plus another Claude review on the new local head
   - `PASS_WITH_FINDINGS` allows publish after the configured number of local Claude review passes has been consumed; with `claudePassWithFindingsReviews = 1`, Codex fixes once and the lane publishes without another Claude pass
