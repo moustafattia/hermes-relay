@@ -262,3 +262,22 @@ The one-release back-compat aliases introduced in Phases B / D-1 have been remov
 - The `run_claude_review` action-type literal is no longer dispatched — only `run_internal_review`
 - `get_review(reviews, key)` no longer falls back to legacy ledger keys — `migrate_persisted_ledger` already ran on D-1 boot
 - 8 functions in `workflows/code_review/reviews.py` were renamed (`fetch_codex_cloud_review` → `fetch_external_review`, etc.); old names retained as one-release aliases
+
+## Persisted-state migration round 2 (Phase D-3)
+
+Five additional top-level ledger fields renamed for provider neutrality:
+- `claudeRepairHandoff` → `internalReviewRepairHandoff`
+- `codexCloudRepairHandoff` → `externalReviewRepairHandoff`
+- `codexCloudAutoResolved` → `externalReviewAutoResolved`
+- `interReviewAgentModel` → `internalReviewerModel`
+- `lastClaudeVerdict` → `lastInternalVerdict`
+
+Plus `claudeModel` is dropped entirely — its value lives in `internalReviewerModel` after the rename.
+
+**Migration is automatic** on workspace bootstrap (atomic temp+rename, idempotent), same mechanism as Phase D-1.
+
+**Read-both / write-new** for one release via the new `get_ledger_field(ledger, new_key)` helper.
+
+**Status output keys also renamed** — external tooling that parsed `claudeModel` / `interReviewAgentModel` / `codexCloudAutoResolved` / `lastClaudeVerdict` from `yoyopod-workflow-status.json` should switch to the new names.
+
+**Workspace internals.** Four `_codex_cloud_repair_handoff_*` shims in `workflows/code_review/workspace.py` renamed to `_external_review_repair_handoff_*`. Workspace-internal API; affects subagent test fixtures only.
