@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+from workflows.code_review.migrations import get_review
+
 
 """YoYoPod Core session and worktree helpers.
 
@@ -126,7 +128,7 @@ def should_escalate_codex_model(
     restart_state = lane_state.get("restart") or {}
     restart_count = int(restart_state.get("count") or 0)
     local_review_count = int(review_state.get("localClaudeReviewCount") or 0)
-    codex_review = (reviews or {}).get("codexCloud") or {}
+    codex_review = get_review(reviews, "externalReview")
     codex_open_findings = int(codex_review.get("openFindingCount") or 0)
     if restart_count >= escalate_restart_count:
         return True

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from workflows.code_review.health import compute_health, compute_stale_lane_reasons
+from workflows.code_review.migrations import get_review
 from workflows.code_review.paths import (
     lane_memo_path,
     lane_state_path,
@@ -238,7 +239,7 @@ def normalize_status(status: dict[str, Any], workflow_root: Path | None = None) 
     open_pr = normalized.get("openPr")
     ledger = normalized.get("ledger") or {}
     reviews = normalized.get("reviews") or {}
-    codex_cloud = reviews.get("codexCloud") or {}
+    codex_cloud = get_review(reviews, "externalReview")
 
     implementation["sessionActionRecommendation"] = decide_session_action(
         active_session_health=implementation.get("activeSessionHealth"),
@@ -437,8 +438,8 @@ def assemble_status_payload(
             "sessionNudge": ledger.get("sessionNudge"),
             "repairBrief": effective_repair_brief,
             "codexModel": implementation.get("codexModel") or preferred_codex_model or (ledger.get("implementation") or {}).get("codexModel"),
-            "claudeModel": ledger.get("claudeModel") or ledger.get("interReviewAgentModel") or ((reviews.get("claudeCode") or {}).get("model")) or inter_review_agent_model,
-            "interReviewAgentModel": ledger.get("interReviewAgentModel") or ledger.get("claudeModel") or ((reviews.get("claudeCode") or {}).get("model")) or inter_review_agent_model,
+            "claudeModel": ledger.get("claudeModel") or ledger.get("interReviewAgentModel") or (get_review(reviews, "internalReview").get("model")) or inter_review_agent_model,
+            "interReviewAgentModel": ledger.get("interReviewAgentModel") or ledger.get("claudeModel") or (get_review(reviews, "internalReview").get("model")) or inter_review_agent_model,
             "workflowActors": ledger.get("workflowActors") or actor_labels,
         },
         "implementation": {
@@ -465,7 +466,7 @@ def assemble_status_payload(
         },
         "reviews": {
             **reviews,
-            "interReviewAgent": reviews.get("claudeCode"),
+            "interReviewAgent": get_review(reviews, "internalReview") or None,
         },
         "derivedReviewLoopState": review_loop_state,
         "derivedMergeBlocked": merge_blocked,
@@ -512,7 +513,7 @@ def derive_latest_progress(
         "kind": (impl.get("status") or ledger.get("workflowState") or "unknown"),
         "at": impl.get("updatedAt") or now_iso,
     }
-    codex_review = reviews.get("codexCloud") or {}
+    codex_review = get_review(reviews, "externalReview")
     codex_updated_at = codex_review.get("updatedAt")
     if (
         open_pr
@@ -549,8 +550,10 @@ def apply_ledger_reviews_and_header(
     ledger.setdefault("approval", {})
     ledger.setdefault("reviews", {})
     ledger["reviews"]["rockClaw"] = reviews["rockClaw"]
-    ledger["reviews"]["claudeCode"] = reviews["claudeCode"]
-    ledger["reviews"]["codexCloud"] = reviews["codexCloud"]
+    ledger["reviews"]["internalReview"] = reviews["internalReview"]
+    ledger["reviews"]["externalReview"] = reviews["externalReview"]
+    ledger["reviews"].pop("claudeCode", None)
+    ledger["reviews"].pop("codexCloud", None)
 
 
 def apply_ledger_implementation_merge(
@@ -638,7 +641,7 @@ def apply_active_lane_ledger_transition(
         "merged": False,
         "isDraft": (open_pr or {}).get("isDraft"),
     }
-    claude_review = reviews.get("claudeCode") or {}
+    claude_review = get_review(reviews, "internalReview")
     local_head_sha = implementation.get("localHeadSha")
     prepublish_gate_ready = (
         claude_review.get("verdict") == "PASS_CLEAN"
@@ -920,23 +923,23 @@ def write_lane_state(
         },
         "review": {
             "repairBriefHeadSha": (repair_brief or {}).get("forHeadSha"),
-            "lastClaudeReviewedHeadSha": ((reviews.get("claudeCode") or {}).get("reviewedHeadSha")) or ((existing.get("review") or {}).get("lastClaudeReviewedHeadSha")),
-            "lastClaudeVerdict": ((reviews.get("claudeCode") or {}).get("verdict")) or ((existing.get("review") or {}).get("lastClaudeVerdict")),
-            "localClaudeReviewCount": local_inter_review_agent_review_count(reviews.get("claudeCode"), existing),
-            "currentClaudeRunId": ((reviews.get("claudeCode") or {}).get("runId")),
-            "currentClaudeTargetHeadSha": inter_review_agent_target_head(reviews.get("claudeCode")),
-            "currentClaudeStatus": ((reviews.get("claudeCode") or {}).get("status")),
-            "currentClaudeTerminalState": ((reviews.get("claudeCode") or {}).get("terminalState")),
-            "lastClaudeFailureClass": ((reviews.get("claudeCode") or {}).get("failureClass")),
-            "lastInterReviewAgentReviewedHeadSha": ((reviews.get("claudeCode") or {}).get("reviewedHeadSha")) or ((existing.get("review") or {}).get("lastInterReviewAgentReviewedHeadSha")),
-            "lastInterReviewAgentVerdict": ((reviews.get("claudeCode") or {}).get("verdict")) or ((existing.get("review") or {}).get("lastInterReviewAgentVerdict")),
-            "localInterReviewAgentReviewCount": local_inter_review_agent_review_count(reviews.get("claudeCode"), existing),
-            "currentInterReviewAgentRunId": ((reviews.get("claudeCode") or {}).get("runId")),
-            "currentInterReviewAgentTargetHeadSha": inter_review_agent_target_head(reviews.get("claudeCode")),
-            "currentInterReviewAgentStatus": ((reviews.get("claudeCode") or {}).get("status")),
-            "currentInterReviewAgentTerminalState": ((reviews.get("claudeCode") or {}).get("terminalState")),
-            "lastInterReviewAgentFailureClass": ((reviews.get("claudeCode") or {}).get("failureClass")),
-            "lastCodexCloudReviewedHeadSha": ((reviews.get("codexCloud") or {}).get("reviewedHeadSha")),
+            "lastClaudeReviewedHeadSha": ((get_review(reviews, "internalReview")).get("reviewedHeadSha")) or ((existing.get("review") or {}).get("lastClaudeReviewedHeadSha")),
+            "lastClaudeVerdict": ((get_review(reviews, "internalReview")).get("verdict")) or ((existing.get("review") or {}).get("lastClaudeVerdict")),
+            "localClaudeReviewCount": local_inter_review_agent_review_count((get_review(reviews, "internalReview") or None), existing),
+            "currentClaudeRunId": ((get_review(reviews, "internalReview")).get("runId")),
+            "currentClaudeTargetHeadSha": inter_review_agent_target_head((get_review(reviews, "internalReview") or None)),
+            "currentClaudeStatus": ((get_review(reviews, "internalReview")).get("status")),
+            "currentClaudeTerminalState": ((get_review(reviews, "internalReview")).get("terminalState")),
+            "lastClaudeFailureClass": ((get_review(reviews, "internalReview")).get("failureClass")),
+            "lastInterReviewAgentReviewedHeadSha": ((get_review(reviews, "internalReview")).get("reviewedHeadSha")) or ((existing.get("review") or {}).get("lastInterReviewAgentReviewedHeadSha")),
+            "lastInterReviewAgentVerdict": ((get_review(reviews, "internalReview")).get("verdict")) or ((existing.get("review") or {}).get("lastInterReviewAgentVerdict")),
+            "localInterReviewAgentReviewCount": local_inter_review_agent_review_count((get_review(reviews, "internalReview") or None), existing),
+            "currentInterReviewAgentRunId": ((get_review(reviews, "internalReview")).get("runId")),
+            "currentInterReviewAgentTargetHeadSha": inter_review_agent_target_head((get_review(reviews, "internalReview") or None)),
+            "currentInterReviewAgentStatus": ((get_review(reviews, "internalReview")).get("status")),
+            "currentInterReviewAgentTerminalState": ((get_review(reviews, "internalReview")).get("terminalState")),
+            "lastInterReviewAgentFailureClass": ((get_review(reviews, "internalReview")).get("failureClass")),
+            "lastCodexCloudReviewedHeadSha": (get_review(reviews, "externalReview").get("reviewedHeadSha")),
         },
         "failure": {
             "lastClass": failure_class,

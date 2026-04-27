@@ -7,6 +7,8 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Callable
 
+from workflows.code_review.migrations import get_review
+
 
 """YoYoPod Core review-policy helpers.
 
@@ -183,7 +185,7 @@ def classify_lane_failure(
     implementation = implementation or {}
     reviews = reviews or {}
     preflight = preflight or {}
-    codex_review = reviews.get("codexCloud") or {}
+    codex_review = get_review(reviews, "externalReview")
     if (
         codex_review.get("reviewScope") == "postpublish-pr"
         and codex_review.get("status") == "completed"
@@ -204,7 +206,7 @@ def classify_lane_failure(
     }
     if reason in session_failure_map:
         return {"failureClass": session_failure_map[reason], "detail": reason}
-    claude_review = reviews.get("claudeCode") or {}
+    claude_review = get_review(reviews, "internalReview")
     if claude_review.get("status") in {"failed", "timed_out"}:
         detail = claude_review.get("failureClass") or claude_review.get("status")
         return {"failureClass": f"claude_review_{claude_review.get('status')}", "detail": detail}
@@ -595,13 +597,13 @@ def synthesize_repair_brief(
     for source, review in (reviews or {}).items():
         if not review.get("required"):
             continue
-        if source == "codexCloud":
+        if source in ("externalReview", "codexCloud"):
             for thread in review.get("threads", []):
                 if thread.get("status") != "open" or thread.get("isOutdated"):
                     continue
                 item = {
-                    "id": f"codexCloud:{thread['id']}",
-                    "source": "codexCloud",
+                    "id": f"externalReview:{thread['id']}",
+                    "source": "externalReview",
                     "severity": thread["severity"],
                     "summary": thread["summary"],
                     "path": thread.get("path"),
@@ -1348,7 +1350,7 @@ def maybe_dispatch_repair_handoff(
     claude_decision = should_dispatch_claude_repair_handoff(
         lane_state=lane_state,
         session_action=session_action,
-        claude_review=reviews.get("claudeCode"),
+        claude_review=get_review(reviews, "internalReview"),
         repair_brief=repair_brief,
         workflow_state=workflow_state,
         current_head_sha=impl.get("localHeadSha"),
@@ -1358,7 +1360,7 @@ def maybe_dispatch_repair_handoff(
         repair_payload = build_claude_repair_handoff_payload(
             session_action=session_action,
             issue=issue,
-            claude_review=reviews.get("claudeCode"),
+            claude_review=get_review(reviews, "internalReview"),
             repair_brief=repair_brief,
             lane_memo_path=lane_memo_path_str,
             lane_state_path=lane_state_path_str,
@@ -1366,7 +1368,7 @@ def maybe_dispatch_repair_handoff(
         )
         repair_prompt = render_claude_repair_handoff_prompt(
             issue=issue,
-            claude_review=reviews.get("claudeCode"),
+            claude_review=get_review(reviews, "internalReview"),
             repair_brief=repair_brief,
             lane_memo_path=lane_memo_path_obj,
             lane_state_path=lane_state_path_obj,
@@ -1408,7 +1410,7 @@ def maybe_dispatch_repair_handoff(
     codex_cloud_decision = should_dispatch_codex_cloud_repair_handoff(
         lane_state=lane_state,
         session_action=session_action,
-        codex_review=reviews.get("codexCloud"),
+        codex_review=get_review(reviews, "externalReview"),
         repair_brief=repair_brief,
         workflow_state=workflow_state,
         current_head_sha=open_pr.get("headRefOid") or impl.get("localHeadSha"),
@@ -1418,7 +1420,7 @@ def maybe_dispatch_repair_handoff(
         repair_payload = build_codex_cloud_repair_handoff_payload(
             session_action=session_action,
             issue=issue,
-            codex_review=reviews.get("codexCloud"),
+            codex_review=get_review(reviews, "externalReview"),
             repair_brief=repair_brief,
             lane_memo_path=lane_memo_path_str,
             lane_state_path=lane_state_path_str,
@@ -1426,7 +1428,7 @@ def maybe_dispatch_repair_handoff(
         )
         repair_prompt = render_codex_cloud_repair_handoff_prompt(
             issue=issue,
-            codex_review=reviews.get("codexCloud"),
+            codex_review=get_review(reviews, "externalReview"),
             repair_brief=repair_brief,
             lane_memo_path=lane_memo_path_obj,
             lane_state_path=lane_state_path_obj,
@@ -1494,7 +1496,7 @@ def build_reviews_block(
     using adapter-owned review normalizers. ``claude_seed_fn`` is optional; if
     not provided, a minimal pre-publish seed with the given model is used.
     """
-    existing_claude_review = existing_reviews.get("claudeCode")
+    existing_claude_review = get_review(existing_reviews, "internalReview")
     if publish_ready:
         return {
             "rockClaw": normalize_review(
@@ -1504,14 +1506,14 @@ def build_reviews_block(
                 agent_name=advisory_reviewer_agent_name,
                 agent_role="advisory_reviewer_agent",
             ),
-            "claudeCode": normalize_review(
+            "internalReview": normalize_review(
                 {**(existing_claude_review or {}), "model": (existing_claude_review or {}).get("model") or inter_review_agent_model},
                 required=False,
                 pending_summary="Claude pre-publish gate already completed before publication.",
                 agent_name=internal_reviewer_agent_name,
                 agent_role="internal_reviewer_agent",
             ),
-            "codexCloud": {
+            "externalReview": {
                 **codex_cloud,
                 "required": True,
                 "reviewScope": "postpublish-pr",
@@ -1531,14 +1533,14 @@ def build_reviews_block(
             agent_name=advisory_reviewer_agent_name,
             agent_role="advisory_reviewer_agent",
         ),
-        "claudeCode": normalize_review(
+        "internalReview": normalize_review(
             claude_seed,
             required=local_candidate_exists,
             pending_summary="Pending local unpublished branch review before publication.",
             agent_name=internal_reviewer_agent_name,
             agent_role="internal_reviewer_agent",
         ),
-        "codexCloud": {
+        "externalReview": {
             **codex_cloud,
             "agentName": codex_cloud.get("agentName") or external_reviewer_agent_name,
             "agentRole": codex_cloud.get("agentRole") or "external_reviewer_agent",

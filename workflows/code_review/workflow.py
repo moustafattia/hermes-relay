@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from workflows.code_review.migrations import get_review
 from workflows.code_review.reviews import (
     has_local_candidate,
     inter_review_agent_is_running_on_head,
@@ -56,10 +57,10 @@ def derive_next_action(
     budget_state = lane_state.get("budget") or {}
     repair_brief = status.get("repairBrief") or {}
     reviews = status.get("reviews") or {}
-    codex_review = reviews.get("codexCloud") or {}
+    codex_review = get_review(reviews, "externalReview")
     current_postpublish_head = pr_head_sha or local_head_sha
 
-    claude_review = (reviews or {}).get("claudeCode")
+    claude_review = get_review(reviews, "internalReview")
     if inter_review_agent_is_running_on_head(claude_review, local_head_sha):
         return {
             "type": "noop",
@@ -100,7 +101,7 @@ def derive_next_action(
             and workflow_state in {"implementing_local", "awaiting_claude_prepublish", "claude_prepublish_findings", "implementing"}
         ):
             return {
-                "type": "run_claude_review",
+                "type": "run_internal_review",
                 "reason": "prepublish-claude-required",
                 "headSha": claude_preflight.get("currentHeadSha"),
                 "issueNumber": active_lane.get("number"),
@@ -164,7 +165,7 @@ def derive_next_action(
 
     if claude_preflight.get("shouldRun"):
         return {
-            "type": "run_claude_review",
+            "type": "run_internal_review",
             "reason": "prepublish-claude-required",
             "headSha": claude_preflight.get("currentHeadSha"),
             "issueNumber": active_lane.get("number"),
@@ -174,7 +175,7 @@ def derive_next_action(
     if should_dispatch_claude_repair_handoff(
         lane_state=lane_state,
         session_action=session_action,
-        claude_review=(reviews or {}).get("claudeCode"),
+        claude_review=get_review(reviews, "internalReview"),
         repair_brief=repair_brief,
         workflow_state=workflow_state,
         current_head_sha=local_head_sha,
