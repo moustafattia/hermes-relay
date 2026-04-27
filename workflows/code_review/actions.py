@@ -170,7 +170,7 @@ def run_dispatch_lane_turn(
     close_acpx_session_fn: Callable[..., Any],
     ensure_acpx_session_fn: Callable[..., dict[str, Any]],
     show_acpx_session_fn: Callable[..., dict[str, Any] | None],
-    run_acpx_prompt_fn: Callable[..., Any],
+    run_prompt_fn: Callable[..., Any],
     prepare_lane_worktree_fn: Callable[..., dict[str, Any]],
     codex_model_for_issue_fn: Callable[..., str],
     get_issue_details_fn: Callable[[Any], dict[str, Any] | None],
@@ -239,7 +239,7 @@ def run_dispatch_lane_turn(
     )
     session_record_id = session_meta.get('record_id') or ensured.get('acpxRecordId')
     try:
-        prompt_result = run_acpx_prompt_fn(
+        prompt_result = run_prompt_fn(
             worktree=worktree,
             session_name=session_name,
             prompt=prompt,
@@ -263,7 +263,7 @@ def run_dispatch_lane_turn(
         )
         session_meta = show_acpx_session_fn(worktree=worktree, session_name=session_name) or session_meta
         session_record_id = session_meta.get('record_id') or ensured.get('acpxRecordId')
-        prompt_result = run_acpx_prompt_fn(
+        prompt_result = run_prompt_fn(
             worktree=worktree,
             session_name=session_name,
             prompt=prompt,

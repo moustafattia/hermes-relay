@@ -896,7 +896,7 @@ def test_maybe_dispatch_repair_handoff_dispatches_claude_branch_when_routable(tm
         ledger=ledger,
         now_iso="2026-04-22T00:05:00Z",
         codex_model="gpt-5.3-codex",
-        run_acpx_prompt_fn=run_acpx,
+        run_prompt_fn=run_acpx,
         audit_fn=audit,
     )
 
@@ -950,7 +950,7 @@ def test_maybe_dispatch_repair_handoff_dispatches_codex_cloud_branch_when_routab
         ledger=ledger,
         now_iso="2026-04-22T00:05:00Z",
         codex_model="gpt-5.3-codex",
-        run_acpx_prompt_fn=run_acpx,
+        run_prompt_fn=run_acpx,
         audit_fn=audit,
     )
 
@@ -990,7 +990,7 @@ def test_maybe_dispatch_repair_handoff_returns_noop_when_no_dispatch_branch_is_r
         ledger=ledger,
         now_iso="2026-04-22T00:05:00Z",
         codex_model="gpt-5.3-codex",
-        run_acpx_prompt_fn=run_acpx,
+        run_prompt_fn=run_acpx,
         audit_fn=audit,
     )
 
@@ -1009,7 +1009,7 @@ def test_maybe_dispatch_repair_handoff_short_circuits_when_no_active_lane(tmp_pa
         ledger={},
         now_iso="2026-04-22T00:00:00Z",
         codex_model=None,
-        run_acpx_prompt_fn=run_acpx,
+        run_prompt_fn=run_acpx,
         audit_fn=audit,
     )
     assert changed is False
