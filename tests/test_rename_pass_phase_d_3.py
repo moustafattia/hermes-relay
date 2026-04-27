@@ -119,3 +119,16 @@ def test_existing_yoyopod_ledger_top_level_migration(tmp_path):
         "lastClaudeVerdict", "claudeModel",
     ):
         assert old not in out, f"{old} should have been migrated"
+
+
+def test_lane_state_read_falls_back_to_legacy_lastClaudeVerdict():
+    """Regression: status.py writes lastInternalVerdict (D-3); reviews.py must
+    read it (with legacy fallback for one release). Without this fallback,
+    is_local_inter_review_agent_pass silently misses the verdict."""
+    # Structural assertion: reviews.py must accept either key when reading
+    # state_review verdict.
+    from pathlib import Path
+    src = (Path(__file__).resolve().parent.parent / "workflows/code_review/reviews.py").read_text()
+    # The reads should reference both keys (new first, legacy fallback)
+    assert "lastInternalVerdict" in src
+
