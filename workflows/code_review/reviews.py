@@ -469,7 +469,7 @@ def normalize_review(
     }
 
 
-def codex_cloud_placeholder(
+def external_review_placeholder(
     *,
     required: bool,
     status: str,
@@ -495,7 +495,7 @@ def codex_cloud_placeholder(
     )
 
 
-def build_codex_cloud_thread(
+def build_external_review_thread(
     *,
     node: dict[str, Any],
     comment: dict[str, Any],
@@ -528,7 +528,7 @@ def build_codex_cloud_thread(
     }
 
 
-def summarize_codex_cloud_review(
+def summarize_external_review(
     *,
     head_sha: str | None,
     latest_ts: str | None,
@@ -597,7 +597,7 @@ def synthesize_repair_brief(
     for source, review in (reviews or {}).items():
         if not review.get("required"):
             continue
-        if source in ("externalReview", "codexCloud"):
+        if source == "externalReview":
             for thread in review.get("threads", []):
                 if thread.get("status") != "open" or thread.get("isOutdated"):
                     continue
@@ -728,7 +728,7 @@ def resolve_codex_superseded_threads(
     return resolved
 
 
-def fetch_codex_pr_body_signal(
+def fetch_external_review_pr_body_signal(
     pr_number: int | None,
     *,
     run_json_fn: Callable[..., Any],
@@ -776,7 +776,7 @@ def fetch_codex_pr_body_signal(
     }
 
 
-def fetch_codex_cloud_review(
+def fetch_external_review(
     pr_number: int | None,
     *,
     current_head_sha: str | None,
@@ -791,8 +791,8 @@ def fetch_codex_cloud_review(
     now_epoch_fn: Callable[[], float] = time.time,
     extract_severity_fn: Callable[[str], str] = lambda _body: "minor",
     extract_summary_fn: Callable[[str], str] = lambda body: body,
-    build_thread_fn: Callable[..., dict[str, Any]] = build_codex_cloud_thread,
-    summarize_review_fn: Callable[..., dict[str, Any]] = summarize_codex_cloud_review,
+    build_thread_fn: Callable[..., dict[str, Any]] = build_external_review_thread,
+    summarize_review_fn: Callable[..., dict[str, Any]] = summarize_external_review,
     agent_name: str = "External_Reviewer_Agent",
 ) -> dict[str, Any]:
     base = {
@@ -999,7 +999,7 @@ def build_inter_review_agent_completed_review(
     )
 
 
-def build_codex_cloud_repair_handoff_payload(
+def build_external_review_repair_handoff_payload(
     *,
     session_action: dict[str, Any],
     issue: dict[str, Any] | None,
@@ -1027,7 +1027,7 @@ def build_codex_cloud_repair_handoff_payload(
     }
 
 
-def record_codex_cloud_repair_handoff(
+def record_external_review_repair_handoff(
     *,
     worktree: Any,
     payload: dict[str, Any],
@@ -1231,7 +1231,7 @@ def should_dispatch_claude_repair_handoff(
     return {"shouldDispatch": True, "reason": None}
 
 
-def should_dispatch_codex_cloud_repair_handoff(
+def should_dispatch_external_review_repair_handoff(
     *,
     lane_state: dict[str, Any] | None,
     session_action: dict[str, Any],
@@ -1301,7 +1301,7 @@ def maybe_dispatch_repair_handoff(
     ledger: dict[str, Any],
     now_iso: str,
     codex_model: str | None,
-    run_acpx_prompt_fn: Callable[..., Any],
+    run_prompt_fn: Callable[..., Any],
     audit_fn: Callable[..., Any],
     lane_state_override: dict[str, Any] | None = None,
     lane_state_path_fn: Callable[[Any], Any] | None = None,
@@ -1312,7 +1312,7 @@ def maybe_dispatch_repair_handoff(
 ) -> tuple[dict[str, Any], bool]:
     """Adapter-owned implementation of the wrapper's ``_maybe_dispatch_repair_handoff``.
 
-    Callers inject the side-effectful primitives (``run_acpx_prompt_fn`` to poke
+    Callers inject the side-effectful primitives (``run_prompt_fn`` to poke
     the actor session; ``audit_fn`` for audit trail) and optionally custom
     lane-state path / JSON I/O helpers. The default helpers write a
     ``.lane-state.json`` file adjacent to the worktree using stdlib primitives,
@@ -1322,7 +1322,7 @@ def maybe_dispatch_repair_handoff(
 
     from workflows.code_review.prompts import (
         render_claude_repair_handoff_prompt,
-        render_codex_cloud_repair_handoff_prompt,
+        render_external_reviewer_repair_handoff_prompt,
     )
 
     lane_state_path_fn = lane_state_path_fn or _default_lane_state_path
@@ -1374,7 +1374,7 @@ def maybe_dispatch_repair_handoff(
             lane_state_path=lane_state_path_obj,
             internal_reviewer_agent_name=internal_reviewer_agent_name,
         )
-        run_acpx_prompt_fn(
+        run_prompt_fn(
             worktree=worktree,
             session_name=repair_payload.get("sessionName"),
             prompt=repair_prompt,
@@ -1407,7 +1407,7 @@ def maybe_dispatch_repair_handoff(
             "payload": repair_payload,
         }, True
 
-    codex_cloud_decision = should_dispatch_codex_cloud_repair_handoff(
+    codex_cloud_decision = should_dispatch_external_review_repair_handoff(
         lane_state=lane_state,
         session_action=session_action,
         codex_review=get_review(reviews, "externalReview"),
@@ -1417,7 +1417,7 @@ def maybe_dispatch_repair_handoff(
         has_open_pr=bool(open_pr),
     )
     if codex_cloud_decision.get("shouldDispatch"):
-        repair_payload = build_codex_cloud_repair_handoff_payload(
+        repair_payload = build_external_review_repair_handoff_payload(
             session_action=session_action,
             issue=issue,
             codex_review=get_review(reviews, "externalReview"),
@@ -1426,7 +1426,7 @@ def maybe_dispatch_repair_handoff(
             lane_state_path=lane_state_path_str,
             now_iso=now_iso,
         )
-        repair_prompt = render_codex_cloud_repair_handoff_prompt(
+        repair_prompt = render_external_reviewer_repair_handoff_prompt(
             issue=issue,
             codex_review=get_review(reviews, "externalReview"),
             repair_brief=repair_brief,
@@ -1435,13 +1435,13 @@ def maybe_dispatch_repair_handoff(
             pr_url=open_pr.get("url"),
             external_reviewer_agent_name=external_reviewer_agent_name,
         )
-        run_acpx_prompt_fn(
+        run_prompt_fn(
             worktree=worktree,
             session_name=repair_payload.get("sessionName"),
             prompt=repair_prompt,
             codex_model=codex_model,
         )
-        record_codex_cloud_repair_handoff(
+        record_external_review_repair_handoff(
             worktree=worktree,
             payload=repair_payload,
             lane_state_path_fn=lane_state_path_fn,
@@ -1713,3 +1713,14 @@ def run_inter_review_agent_review(
         'minorSuggestions': list(payload.get('minorSuggestions') or []),
         'requiredNextAction': payload.get('requiredNextAction'),
     }
+
+
+# Phase D-2 aliases — drop next release
+codex_cloud_placeholder = external_review_placeholder
+build_codex_cloud_thread = build_external_review_thread
+summarize_codex_cloud_review = summarize_external_review
+fetch_codex_pr_body_signal = fetch_external_review_pr_body_signal
+fetch_codex_cloud_review = fetch_external_review
+build_codex_cloud_repair_handoff_payload = build_external_review_repair_handoff_payload
+record_codex_cloud_repair_handoff = record_external_review_repair_handoff
+should_dispatch_codex_cloud_repair_handoff = should_dispatch_external_review_repair_handoff

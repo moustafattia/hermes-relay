@@ -312,7 +312,7 @@ def _dispatch_deps(tmp_path: Path):
         "close_acpx_session_fn": close_fn,
         "ensure_acpx_session_fn": ensure_fn,
         "show_acpx_session_fn": show_fn,
-        "run_acpx_prompt_fn": run_prompt_fn,
+        "run_prompt_fn": run_prompt_fn,
         "prepare_lane_worktree_fn": prepare_worktree_fn,
         "codex_model_for_issue_fn": codex_model_for_issue_fn,
         "get_issue_details_fn": get_issue_details_fn,

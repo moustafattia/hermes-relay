@@ -253,3 +253,12 @@ The workflow ledger renames two `reviews.*` keys for provider neutrality:
 **Action-type literal.** The transient action `run_claude_review` is renamed to `run_internal_review`. The dispatcher accepts both for one release.
 
 **What this means for you:** nothing — the rename is transparent. If you write external tooling that reads the ledger directly (e.g., a dashboard parsing `yoyopod-workflow-status.json`), update it to use `reviews.internalReview` / `reviews.externalReview`.
+
+## Deprecation cleanup (Phase D-2)
+
+The one-release back-compat aliases introduced in Phases B / D-1 have been removed:
+- `render_codex_cloud_repair_handoff_prompt` no longer importable — use `render_external_reviewer_repair_handoff_prompt`
+- Top-level `codex-bot:` block in `workflow.yaml` is no longer honored — move `logins` / `clean-reactions` / `pending-reactions` into `agents.external-reviewer:`
+- The `run_claude_review` action-type literal is no longer dispatched — only `run_internal_review`
+- `get_review(reviews, key)` no longer falls back to legacy ledger keys — `migrate_persisted_ledger` already ran on D-1 boot
+- 8 functions in `workflows/code_review/reviews.py` were renamed (`fetch_codex_cloud_review` → `fetch_external_review`, etc.); old names retained as one-release aliases
