@@ -57,7 +57,7 @@ def derive_next_action(
     budget_state = lane_state.get("budget") or {}
     repair_brief = status.get("repairBrief") or {}
     reviews = status.get("reviews") or {}
-    codex_review = reviews.get("codexCloud") or {}
+    codex_review = get_review(reviews, "externalReview")
     current_postpublish_head = pr_head_sha or local_head_sha
 
     claude_review = get_review(reviews, "internalReview")

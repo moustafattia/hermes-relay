@@ -239,7 +239,7 @@ def normalize_status(status: dict[str, Any], workflow_root: Path | None = None) 
     open_pr = normalized.get("openPr")
     ledger = normalized.get("ledger") or {}
     reviews = normalized.get("reviews") or {}
-    codex_cloud = reviews.get("codexCloud") or {}
+    codex_cloud = get_review(reviews, "externalReview")
 
     implementation["sessionActionRecommendation"] = decide_session_action(
         active_session_health=implementation.get("activeSessionHealth"),
@@ -513,7 +513,7 @@ def derive_latest_progress(
         "kind": (impl.get("status") or ledger.get("workflowState") or "unknown"),
         "at": impl.get("updatedAt") or now_iso,
     }
-    codex_review = reviews.get("codexCloud") or {}
+    codex_review = get_review(reviews, "externalReview")
     codex_updated_at = codex_review.get("updatedAt")
     if (
         open_pr
@@ -937,7 +937,7 @@ def write_lane_state(
             "currentInterReviewAgentStatus": ((reviews.get("claudeCode") or {}).get("status")),
             "currentInterReviewAgentTerminalState": ((reviews.get("claudeCode") or {}).get("terminalState")),
             "lastInterReviewAgentFailureClass": ((reviews.get("claudeCode") or {}).get("failureClass")),
-            "lastCodexCloudReviewedHeadSha": ((reviews.get("codexCloud") or {}).get("reviewedHeadSha")),
+            "lastCodexCloudReviewedHeadSha": (get_review(reviews, "externalReview").get("reviewedHeadSha")),
         },
         "failure": {
             "lastClass": failure_class,

@@ -81,7 +81,7 @@ def build_status_raw(workspace: Any) -> dict[str, Any]:
         codex_cloud = ws._fetch_codex_cloud_review(
             open_pr.get("number") if open_pr else None,
             open_pr.get("headRefOid") if open_pr else None,
-            existing_reviews.get("codexCloud"),
+            get_review(existing_reviews, "externalReview"),
         )
     elif open_pr and open_pr.get("isDraft"):
         codex_cloud = ws._codex_cloud_placeholder(
@@ -481,7 +481,7 @@ def reconcile(workspace: Any, *, write_health: bool = True, fix_watchers: bool =
             )
 
     resolved_codex_threads = ws._resolve_codex_superseded_threads(
-        reviews.get("codexCloud") or {},
+        get_review(reviews, "externalReview"),
         current_head_sha=(open_pr or {}).get("headRefOid"),
     )
     if resolved_codex_threads:
@@ -489,7 +489,7 @@ def reconcile(workspace: Any, *, write_health: bool = True, fix_watchers: bool =
             "at": now_iso,
             "headSha": (open_pr or {}).get("headRefOid"),
             "prNumber": (open_pr or {}).get("number"),
-            "signal": ((reviews.get("codexCloud") or {}).get("prBodySignal") or {}).get("content"),
+            "signal": (get_review(reviews, "externalReview").get("prBodySignal") or {}).get("content"),
             "threadIds": resolved_codex_threads,
         }
         ledger["codexCloudAutoResolved"] = resolution_event
@@ -500,7 +500,7 @@ def reconcile(workspace: Any, *, write_health: bool = True, fix_watchers: bool =
             activeLane=(active_lane or {}).get("number"),
             prNumber=(open_pr or {}).get("number"),
             headSha=(open_pr or {}).get("headRefOid"),
-            signal=((reviews.get("codexCloud") or {}).get("prBodySignal") or {}).get("content"),
+            signal=(get_review(reviews, "externalReview").get("prBodySignal") or {}).get("content"),
         )
         status = ws.build_status()
         reviews = status.get("reviews") or reviews

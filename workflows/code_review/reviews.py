@@ -185,7 +185,7 @@ def classify_lane_failure(
     implementation = implementation or {}
     reviews = reviews or {}
     preflight = preflight or {}
-    codex_review = reviews.get("codexCloud") or {}
+    codex_review = get_review(reviews, "externalReview")
     if (
         codex_review.get("reviewScope") == "postpublish-pr"
         and codex_review.get("status") == "completed"
@@ -1410,7 +1410,7 @@ def maybe_dispatch_repair_handoff(
     codex_cloud_decision = should_dispatch_codex_cloud_repair_handoff(
         lane_state=lane_state,
         session_action=session_action,
-        codex_review=reviews.get("codexCloud"),
+        codex_review=get_review(reviews, "externalReview"),
         repair_brief=repair_brief,
         workflow_state=workflow_state,
         current_head_sha=open_pr.get("headRefOid") or impl.get("localHeadSha"),
@@ -1420,7 +1420,7 @@ def maybe_dispatch_repair_handoff(
         repair_payload = build_codex_cloud_repair_handoff_payload(
             session_action=session_action,
             issue=issue,
-            codex_review=reviews.get("codexCloud"),
+            codex_review=get_review(reviews, "externalReview"),
             repair_brief=repair_brief,
             lane_memo_path=lane_memo_path_str,
             lane_state_path=lane_state_path_str,
@@ -1428,7 +1428,7 @@ def maybe_dispatch_repair_handoff(
         )
         repair_prompt = render_codex_cloud_repair_handoff_prompt(
             issue=issue,
-            codex_review=reviews.get("codexCloud"),
+            codex_review=get_review(reviews, "externalReview"),
             repair_brief=repair_brief,
             lane_memo_path=lane_memo_path_obj,
             lane_state_path=lane_state_path_obj,
