@@ -101,7 +101,7 @@ def derive_next_action(
             and workflow_state in {"implementing_local", "awaiting_claude_prepublish", "claude_prepublish_findings", "implementing"}
         ):
             return {
-                "type": "run_claude_review",
+                "type": "run_internal_review",
                 "reason": "prepublish-claude-required",
                 "headSha": claude_preflight.get("currentHeadSha"),
                 "issueNumber": active_lane.get("number"),
@@ -165,7 +165,7 @@ def derive_next_action(
 
     if claude_preflight.get("shouldRun"):
         return {
-            "type": "run_claude_review",
+            "type": "run_internal_review",
             "reason": "prepublish-claude-required",
             "headSha": claude_preflight.get("currentHeadSha"),
             "issueNumber": active_lane.get("number"),

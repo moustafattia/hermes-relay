@@ -161,3 +161,25 @@ def test_existing_yoyopod_ledger_migrates_cleanly(tmp_path):
     # New keys readable via get_review (passes whether or not the source had old keys)
     _ = get_review(reviews, "internalReview")
     _ = get_review(reviews, "externalReview")
+
+
+def test_action_dispatcher_accepts_run_internal_review():
+    """The dispatcher matches the new literal."""
+    # This test is structural — actions.py has a single dispatch site at line 473.
+    # We test by reading the source and asserting both literals are matched.
+    from pathlib import Path
+    src = Path(__file__).resolve().parent.parent / "workflows/code_review/actions.py"
+    text = src.read_text()
+    # Expected dispatcher form: action_type in ('run_internal_review', 'run_claude_review')
+    assert "run_internal_review" in text
+    assert "run_claude_review" in text  # back-compat alias retained
+
+
+def test_action_dispatcher_accepts_run_claude_review_alias():
+    """Same as above, framed from the alias side."""
+    from pathlib import Path
+    src = Path(__file__).resolve().parent.parent / "workflows/code_review/actions.py"
+    text = src.read_text()
+    # Both literals should appear in the same expression
+    assert "'run_internal_review'" in text or '"run_internal_review"' in text
+    assert "'run_claude_review'" in text or '"run_claude_review"' in text

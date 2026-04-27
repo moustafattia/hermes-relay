@@ -446,6 +446,8 @@ def make_workspace(*, workspace_root: Path, config: dict[str, Any]) -> SimpleNam
     cron_jobs_path = Path(config["cronJobsPath"])
     hermes_cron_jobs_path = Path(config.get("hermesCronJobsPath") or (Path.home() / ".hermes/cron/jobs.json"))
     ledger_path = Path(config["ledgerPath"])
+    from workflows.code_review.migrations import migrate_persisted_ledger
+    migrate_persisted_ledger(ledger_path)
     health_path = Path(config["healthPath"])
     audit_log_path = Path(config["auditLogPath"])
     sessions_state_path = workspace_root / "state/sessions"
