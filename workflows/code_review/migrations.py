@@ -69,8 +69,9 @@ def migrate_persisted_ledger(path: Path | str) -> bool:
     except (json.JSONDecodeError, OSError):
         return False
 
-    _, changed = migrate_review_keys(ledger)
-    if not changed:
+    _, c1 = migrate_review_keys(ledger)
+    _, c2 = migrate_top_level_keys(ledger)
+    if not (c1 or c2):
         return False
 
     # Atomic temp-file + rename in the same directory.
@@ -89,3 +90,52 @@ def migrate_persisted_ledger(path: Path | str) -> bool:
             pass
         raise
     return True
+
+
+LEDGER_KEY_RENAMES: dict[str, str] = {
+    "claudeRepairHandoff": "internalReviewRepairHandoff",
+    "codexCloudRepairHandoff": "externalReviewRepairHandoff",
+    "codexCloudAutoResolved": "externalReviewAutoResolved",
+    "interReviewAgentModel": "internalReviewerModel",
+    "lastClaudeVerdict": "lastInternalVerdict",
+}
+
+_LEGACY_LEDGER_KEY_FOR: dict[str, str] = {v: k for k, v in LEDGER_KEY_RENAMES.items()}
+
+# Top-level keys that are dropped entirely (no rename target).
+# claudeModel is canonicalized as internalReviewerModel via the
+# interReviewAgentModel migration; the explicit claudeModel mirror
+# from the previous migration round is no longer needed.
+LEDGER_KEYS_TO_DROP: set[str] = {"claudeModel"}
+
+
+def migrate_top_level_keys(ledger: dict) -> tuple[dict, bool]:
+    """Rewrite legacy top-level ledger keys per LEDGER_KEY_RENAMES.
+
+    If both old and new keys are present, the new value wins and the
+    old key is dropped. Keys in LEDGER_KEYS_TO_DROP are removed entirely.
+    Returns (ledger, was_changed). Mutates in place.
+    """
+    changed = False
+    for old, new in LEDGER_KEY_RENAMES.items():
+        if old in ledger:
+            if new not in ledger:
+                ledger[new] = ledger[old]
+            del ledger[old]
+            changed = True
+    for k in LEDGER_KEYS_TO_DROP:
+        if k in ledger:
+            del ledger[k]
+            changed = True
+    return ledger, changed
+
+
+def get_ledger_field(ledger: dict | None, new_key: str):
+    """Read a top-level ledger field by its new key; fall back to legacy."""
+    ledger = ledger or {}
+    if new_key in ledger:
+        return ledger[new_key]
+    legacy = _LEGACY_LEDGER_KEY_FOR.get(new_key)
+    if legacy and legacy in ledger:
+        return ledger[legacy]
+    return None
