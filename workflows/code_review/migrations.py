@@ -71,7 +71,8 @@ def migrate_persisted_ledger(path: Path | str) -> bool:
 
     _, c1 = migrate_review_keys(ledger)
     _, c2 = migrate_top_level_keys(ledger)
-    if not (c1 or c2):
+    _, c3 = migrate_lane_state_review_keys(ledger)
+    if not (c1 or c2 or c3):
         return False
 
     # Atomic temp-file + rename in the same directory.
@@ -134,3 +135,47 @@ def migrate_top_level_keys(ledger: dict) -> tuple[dict, bool]:
 def get_ledger_field(ledger: dict | None, new_key: str):
     """Read a top-level ledger field. Returns None if absent."""
     return (ledger or {}).get(new_key)
+
+
+LANE_STATE_REVIEW_KEY_RENAMES: dict[str, str] = {
+    "lastClaudeReviewedHeadSha": "lastInternalReviewedHeadSha",
+    "localClaudeReviewCount": "localInternalReviewCount",
+}
+
+_LEGACY_LANE_STATE_REVIEW_KEY_FOR: dict[str, str] = {
+    v: k for k, v in LANE_STATE_REVIEW_KEY_RENAMES.items()
+}
+
+
+def migrate_lane_state_review_keys(ledger: dict) -> tuple[dict, bool]:
+    """Rewrite ledger.implementation.laneState.review.<key> per
+    LANE_STATE_REVIEW_KEY_RENAMES. Returns (ledger, was_changed)."""
+    impl = ledger.get("implementation")
+    if not isinstance(impl, dict):
+        return ledger, False
+    lane_state = impl.get("laneState")
+    if not isinstance(lane_state, dict):
+        return ledger, False
+    review = lane_state.get("review")
+    if not isinstance(review, dict):
+        return ledger, False
+
+    changed = False
+    for old, new in LANE_STATE_REVIEW_KEY_RENAMES.items():
+        if old in review:
+            if new not in review:
+                review[new] = review[old]
+            del review[old]
+            changed = True
+    return ledger, changed
+
+
+def get_lane_state_review_field(state_review: dict | None, new_key: str):
+    """Read lane-state review field by new key with legacy fallback (one release)."""
+    state_review = state_review or {}
+    if new_key in state_review:
+        return state_review[new_key]
+    legacy = _LEGACY_LANE_STATE_REVIEW_KEY_FOR.get(new_key)
+    if legacy and legacy in state_review:
+        return state_review[legacy]
+    return None
