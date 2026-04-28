@@ -4,7 +4,7 @@
 
 <br>
 
-**The durable thread for your agents' workflows.**
+**Carries every labeled issue all the way through your workflow.**
 
 *Daedalus the craftsman built the Labyrinth, gave Theseus the thread, and warned Icarus not to fly too close to the sun.*
 
@@ -18,7 +18,7 @@
 
 Daedalus automates your **SDLC** with agents — driven by your GitHub issues. Label an issue and Daedalus walks it through your workflow: picks the right agent for each stage, tracks state, survives crashes, ships when done. The first workflow we ship is **Code-Review** (`Issue → Code → Review → Merge`). More are coming.
 
-## Three myths, three guarantees
+## Three myths, one engine
 
 <table>
 <tr>
