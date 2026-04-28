@@ -11,18 +11,9 @@ ROOT = Path(__file__).resolve().parents[2]
 ASSETS = ROOT / "assets"
 OUT_PATH = ASSETS / "daedalus-banner.gif"
 
-# Right-side hero image. Three vendored options — change BUST_SRC to swap:
-#   "plato-bust.jpg"        — Plato bust photograph (cool blue museum bg)
-#   "daedalus-emblem.jpg"   — "iuvat evasisse" engraving — Daedalus flying
-#                              over the labyrinth (1670s, public domain)
-#   "daedalus-icarus.png"   — Williamson line engraving — Daedalus crafting
-#                              wings while Icarus stands ready (PD)
+# Right-side hero — the "iuvat evasisse" engraving (Daedalus flying
+# above the labyrinth, c. 1670s, public domain).
 BUST_SRC = ASSETS / "source" / "daedalus-emblem.jpg"
-
-# Heuristics for the chroma-key in bust.py:
-#   "photo"     — sample corner colour, drop pixels close to it
-#   "engraving" — drop near-white background of a B/W line engraving
-BUST_BG_KIND = "engraving"
 
 FONT_DISPLAY = ASSETS / "fonts" / "PlayfairDisplay.ttf"
 FONT_DISPLAY_ITALIC = ASSETS / "fonts" / "PlayfairDisplay-Italic.ttf"
@@ -77,8 +68,7 @@ OFFSET_FLOW = 240
 # can carry more weight there. Keeping OFFSET_CAPTION_1 only.)
 OFFSET_CAPTION_1 = 270
 
-# Bust target height (it sits flush to the bottom-right).
-# 380 fills the canvas — good for the Plato bust which is silhouette-y;
-# 320 leaves margin around a square emblem so it reads as a framed plate.
+# Hero image target height — leaves margin so the engraved emblem
+# reads as a framed editorial plate, not a dominating photo.
 BUST_TARGET_H = 320
 BUST_RIGHT_MARGIN = 40

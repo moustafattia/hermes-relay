@@ -2,8 +2,8 @@
 """Thin entrypoint for the README banner generator.
 
 Most of the logic lives in ``scripts/banner/`` as a modular package so
-each visual element (parchment, bust, constellation, code overlays,
-brushstroke, icons, text) can be modified or replaced independently.
+each visual element (parchment, hero emblem, constellation, code overlays,
+icons, text, animated flow) can be modified or replaced independently.
 
 Run::
 

@@ -3,11 +3,10 @@
 Frame layers (bottom → top):
     1. Parchment
     2. Constellation (animated draw-in)
-    3. Bust photograph
-    4. Brushstroke across the bust's eyes (animated)
-    5. Floating code overlays (staggered fade-in)
-    6. Right-margin editorial vignettes
-    7. Left-side title block (always visible — never animated alpha)
+    3. Engraved Daedalus emblem (right-side hero)
+    4. Floating code overlays (staggered fade-in)
+    5. Right-margin editorial vignettes
+    6. Left-side title block (caduceus + wordmark + animated flow line)
 """
 from __future__ import annotations
 
@@ -16,7 +15,6 @@ import random
 from PIL import Image, ImageDraw
 
 from . import (
-    brushstroke,
     bust as bust_mod,
     code_overlays,
     config,
@@ -55,28 +53,15 @@ def render_frame(scene: Scene, f: int) -> Image.Image:
     dim = timeline.hold_to_loop(f)
     cp = timeline.constellation_progress(f) * dim
 
-    # 1+2. constellation (under bust)
+    # 1+2. constellation (under hero)
     constellation.draw(d, scene.nodes, scene.edges, cp, dim)
     im.paste(overlay, (0, 0), overlay)
 
-    # 3. bust photo
+    # 3. engraved hero emblem
     im.paste(scene.bust, (scene.bust_pos["x"], scene.bust_pos["y"]),
              scene.bust)
 
-    # 4. brushstroke across the eyes — only meaningful for the bust photo
-    # (the engraving has no eyes to "censor"; brushstroke would just
-    # bisect the artwork). Skip in engraving mode.
-    if config.BUST_BG_KIND == "photo":
-        bp = timeline.brush_progress(f)
-        if bp > 0:
-            brushstroke.draw(
-                im,
-                scene.bust_pos["eye_x1"], scene.bust_pos["eye_y"] - 22,
-                scene.bust_pos["eye_x2"], scene.bust_pos["eye_y"] + 22,
-                bp,
-            )
-
-    # 5. code overlays (each on its own RGBA layer for clean alpha).
+    # 4. code overlays (each on its own RGBA layer for clean alpha).
     # Anchored relative to the hero image's left edge so they sit next
     # to it without overlap regardless of the hero's width.
     code_layer = Image.new("RGBA", (config.W, config.H), (0, 0, 0, 0))
@@ -96,7 +81,7 @@ def render_frame(scene: Scene, f: int) -> Image.Image:
                              timeline.code_alpha(f, 2))
     im.paste(code_layer, (0, 0), code_layer)
 
-    # 6. right-margin editorial vignettes
+    # 5. right-margin editorial vignettes
     margin = Image.new("RGBA", (config.W, config.H), (0, 0, 0, 0))
     md = ImageDraw.Draw(margin)
     margin_alpha = int(180 * cp)
@@ -104,7 +89,7 @@ def render_frame(scene: Scene, f: int) -> Image.Image:
         icons.draw_margin_icons(md, margin_alpha)
     im.paste(margin, (0, 0), margin)
 
-    # 7. left-side title block (always opaque; workflow flow line
+    # 6. left-side title block (always opaque; workflow flow line
     # animates stage-by-stage with a pulse). text_block paints onto
     # `im` directly so it can paste PNG icons.
     text_block.draw(im, frame=f)
