@@ -98,27 +98,27 @@ The full operator surface is in the [cheat sheet](docs/operator/cheat-sheet.md);
 
 ```mermaid
 flowchart LR
-  ISSUE["🏷️ GitHub issue<br/><sub><i>active-lane label</i></sub>"]
+  ISSUE["GitHub issue<br/>active-lane label"]
 
-  subgraph DAEDALUS["⚙️ Daedalus engine"]
+  subgraph DAEDALUS["Daedalus engine"]
     direction TB
-    WF["workflow.yaml<br/><sub>stages · roles · gates</sub>"]
-    LANE["Lane<br/><sub>one run per active issue</sub>"]
-    WF -. drives .-> LANE
+    WF["workflow.yaml<br/>stages, roles, gates"]
+    LANE["Lane<br/>one run per active issue"]
+    WF -.-> LANE
   end
 
-  subgraph AGENTS["🤖 Agents per role"]
+  subgraph AGENTS["Agents per role"]
     direction TB
-    A1["Coder · Claude"]
-    A2["Reviewer · Codex"]
-    A3["Merger · …"]
+    A1["Coder &middot; Claude"]
+    A2["Reviewer &middot; Codex"]
+    A3["Merger &middot; ..."]
   end
 
-  PR["✅ Merged PR"]
+  PR["Merged PR"]
 
-  ISSUE ==> DAEDALUS
-  DAEDALUS == dispatches ==> AGENTS
-  AGENTS == commits / comments / merges ==> PR
+  ISSUE ==> LANE
+  LANE ==> AGENTS
+  AGENTS ==> PR
 ```
 
 A **labeled issue** is the trigger. The **engine** ticks; for every active issue, it spins up a **lane** — one run of the workflow defined in `workflow.yaml` — and dispatches to the **agent** configured for the current stage. Agents write commits, post review comments, and eventually merge. When the workflow's last gate clears, the PR closes the loop.
