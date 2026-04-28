@@ -1,0 +1,1040 @@
+<!DOCTYPE html><html lang="en"><head>
+
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daedalus — The durable thread for your agents' workflows</title>
+<meta name="description" content="Daedalus automates the SDLC with agents, driven by labeled GitHub issues. A Hermes plugin.">
+<link rel="icon" type="image/svg+xml" href="assets/daedalus-icon.svg">
+<meta name="color-scheme" content="dark">
+
+<style>
+  /* ─── Fonts ─────────────────────────────────────────────────────────── */
+  @font-face {
+    font-family: "Playfair Display";
+    src: url("assets/fonts/PlayfairDisplay.ttf") format("truetype-variations");
+    font-weight: 400 900;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Playfair Display";
+    src: url("assets/fonts/PlayfairDisplay-Italic.ttf") format("truetype-variations");
+    font-weight: 400 900;
+    font-style: italic;
+    font-display: swap;
+  }
+
+  /* ─── Tokens ────────────────────────────────────────────────────────── */
+  :root {
+    /* Sampled from the banner GIF. */
+    --ink-900: #0e1114;       /* page bg, deeper than the banner ink */
+    --ink-800: #14181c;       /* card bg */
+    --ink-700: #1e2226;       /* banner ink, hairlines */
+    --ink-600: #2a2f34;       /* borders */
+
+    --parchment-50: #f1ead9;  /* warmest parchment, used sparingly */
+    --parchment-100: #e2dacc; /* banner background */
+    --parchment-200: #ccc7ba;
+    --parchment-300: #b9b7ae;
+    --parchment-400: #a49d8c;
+    --parchment-500: #7a7466; /* dimmest readable parchment */
+
+    --teal-400: #8fb0b1;      /* hover/highlight */
+    --teal-500: #637f80;      /* accent — the "Workflows that don't melt." color */
+    --teal-600: #4d6566;
+    --teal-900: #1d2828;      /* tinted card hover */
+
+    --serif: "Playfair Display", "Source Serif Pro", Georgia, serif;
+    --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+
+    --measure: 64ch;
+    --container: 1200px;
+    --container-wide: 1320px;
+
+    /* Tweak-driven tokens (overridden by [data-atmosphere] / [data-voice] / [data-ornament]). */
+    --ornament: 1;
+
+    --bg: var(--ink-900);
+    --bg-elev: var(--ink-800);
+    --bg-rule: var(--ink-700);
+    --border: var(--ink-600);
+    --fg: var(--parchment-100);
+    --fg-strong: var(--parchment-50);
+    --fg-soft: var(--parchment-300);
+    --fg-mute: var(--parchment-400);
+    --fg-faint: var(--parchment-500);
+    --accent: var(--teal-500);
+    --accent-strong: var(--teal-400);
+    --btn-primary-bg: var(--parchment-100);
+    --btn-primary-fg: var(--ink-900);
+    --hero-glow: rgba(226, 218, 204, 0.06);
+
+    --headline-family: var(--serif);
+    --headline-weight: 500;
+    --headline-tracking: -0.015em;
+    --headline-transform: none;
+    --headline-style: normal;
+  }
+
+  /* ─── Atmosphere variants ──────────────────────────────────────────── */
+  :root[data-atmosphere="parchment"] {
+    --bg: #ece4d2;
+    --bg-elev: #f3ecdb;
+    --bg-rule: #d6cdb8;
+    --border: #c9bfa6;
+    --fg: #1e2226;
+    --fg-strong: #0e1114;
+    --fg-soft: #3b3f44;
+    --fg-mute: #5b5e62;
+    --fg-faint: #7a7466;
+    --accent: #4d6566;
+    --accent-strong: #2f4445;
+    --btn-primary-bg: #1e2226;
+    --btn-primary-fg: #f1ead9;
+    --hero-glow: rgba(99, 127, 128, 0.10);
+  }
+  :root[data-atmosphere="vellum"] {
+    --bg: #2a2519;
+    --bg-elev: #322c20;
+    --bg-rule: #443d2c;
+    --border: #4f4836;
+    --fg: #efe4c9;
+    --fg-strong: #f6ecd2;
+    --fg-soft: #c8b896;
+    --fg-mute: #9c8c6e;
+    --fg-faint: #75674e;
+    --accent: #c89b56;
+    --accent-strong: #e0b878;
+    --btn-primary-bg: #efe4c9;
+    --btn-primary-fg: #2a2519;
+    --hero-glow: rgba(200, 155, 86, 0.10);
+  }
+
+  /* ─── Voice variants ───────────────────────────────────────────────── */
+  :root[data-voice="operator"] {
+    --headline-family: var(--mono);
+    --headline-weight: 500;
+    --headline-tracking: -0.02em;
+    --headline-transform: none;
+  }
+  :root[data-voice="inscription"] {
+    --headline-family: var(--serif);
+    --headline-weight: 600;
+    --headline-tracking: 0.18em;
+    --headline-transform: uppercase;
+  }
+
+  /* ─── Reset ─────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.55;
+    transition: background 240ms ease, color 240ms ease;
+    font-feature-settings: "kern", "liga", "calt";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  a { color: inherit; text-decoration-color: var(--accent); text-underline-offset: 3px; }
+  a:hover { text-decoration-color: var(--accent-strong); color: var(--accent-strong); }
+  ::selection { background: var(--accent); color: var(--bg); }
+
+  /* ─── Layout primitives ─────────────────────────────────────────────── */
+  .container { max-width: var(--container); margin: 0 auto; padding: 0 32px; }
+  .container-wide { max-width: var(--container-wide); margin: 0 auto; padding: 0 32px; }
+
+  /* ─── Viewport: lock the page to one screen ─────────────────────────── */
+  .viewport {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .viewport > main { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+  .banner-row {
+    width: 100%;
+    max-width: var(--container-wide);
+    margin: 0 auto;
+    padding: 24px 32px 0;
+  }
+  @media (max-width: 980px) { .banner-row { padding: 16px 20px 0; } }
+  .split {
+    width: 100%;
+    max-width: var(--container-wide);
+    margin: 0 auto;
+    padding: 20px 32px 0;
+    display: grid;
+    grid-template-columns: 1fr 1.05fr;
+    gap: 48px;
+    align-items: start;
+  }
+  @media (max-width: 980px) {
+    .viewport { min-height: auto; }
+    .viewport > main { display: block; }
+    .split { grid-template-columns: 1fr; gap: 32px; padding: 24px 20px 0; }
+    .split__right { order: 2; }
+    .hero { order: 1; }
+  }
+  .split__right { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .concepts-row {
+    width: 100%;
+    max-width: var(--container-wide);
+    margin: 24px auto 0;
+    padding: 0 32px 16px;
+  }
+  @media (max-width: 980px) { .concepts-row { padding: 0 20px 16px; } }
+
+
+  
+  /* ─── Hero ──────────────────────────────────────────────────────────── */
+  .hero {
+    padding: 0;
+    position: relative;
+    overflow: hidden;
+  }
+  /* Subtle radial glow — picked from the banner's warm parchment, set very dim. */
+  .hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(900px 380px at 50% 0%, var(--hero-glow), transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero__banner-wrap {
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    /* Soft ring so the banner doesn't sit naked on the page. */
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--fg) 4%, transparent),
+      0 30px 80px -40px rgba(0, 0, 0, 0.9),
+      0 10px 30px -20px rgba(0, 0, 0, 0.7);
+  }
+  /* Ornament: gold-leaf double frame around the banner at high density. */
+  :root[data-ornament="high"] .hero__banner-wrap {
+    box-shadow:
+      0 0 0 1px var(--accent),
+      0 0 0 5px var(--bg),
+      0 0 0 6px color-mix(in oklab, var(--accent) 60%, transparent),
+      0 30px 80px -40px rgba(0, 0, 0, 0.9),
+      0 10px 30px -20px rgba(0, 0, 0, 0.7);
+  }
+  :root[data-ornament="low"] .hero__banner-wrap {
+    border-radius: 4px;
+    box-shadow: 0 20px 50px -30px rgba(0,0,0,.8);
+  }
+  .hero__banner {
+    display: block;
+    width: 100%;
+    height: auto;
+    /* The GIF is 1200×400 (3:1). */
+    aspect-ratio: 3 / 1;
+    object-fit: cover;
+    background: var(--parchment-100); /* shows during load */
+  }
+
+  .hero__copy {
+    margin-top: 14px;
+    text-align: center;
+  }
+  .hero__eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--fg-mute);
+    margin-bottom: 28px;
+    opacity: clamp(0, var(--ornament), 1);
+  }
+  .hero__eyebrow::before,
+  .hero__eyebrow::after {
+    content: "";
+    width: calc(28px * clamp(0, var(--ornament), 1.6));
+    height: 1px;
+    background: var(--border);
+  }
+  .hero__tagline {
+    font-family: var(--headline-family);
+    font-weight: var(--headline-weight);
+    font-size: clamp(36px, 5.6vw, 64px);
+    line-height: 1.08;
+    letter-spacing: var(--headline-tracking);
+    text-transform: var(--headline-transform);
+    color: var(--fg-strong);
+    margin: 0 auto;
+    max-width: 18ch;
+    text-wrap: balance;
+  }
+  /* Inscription voice tightens the line-height and trims max width. */
+  :root[data-voice="inscription"] .hero__tagline { line-height: 1.18; max-width: 22ch; font-size: clamp(28px, 4.4vw, 50px); }
+  /* Operator voice prints "<" and ">" carets around the tagline like a prompt. */
+  :root[data-voice="operator"] .hero__tagline::before { content: "$ "; color: var(--accent); }
+  .hero__tagline em {
+    font-style: italic;
+    color: var(--accent-strong);
+    font-weight: 400;
+    /* Italic accent is the most decorative bit — fade it as ornament drops. */
+    opacity: clamp(0.4, calc(0.4 + 0.6 * var(--ornament)), 1);
+  }
+  :root[data-voice="inscription"] .hero__tagline em { font-style: normal; }
+  :root[data-voice="operator"] .hero__tagline em { font-style: normal; color: var(--accent-strong); }
+
+  .hero__subtitle {
+    margin: 16px auto 0;
+    max-width: 60ch;
+    font-size: 17px;
+    line-height: 1.6;
+    color: var(--fg-soft);
+    text-wrap: pretty;
+  }
+  .hero__subtitle strong {
+    color: var(--fg);
+    font-weight: 500;
+  }
+  /* Three-myth pill row that anchors the tagline */
+  .hero__myths {
+    list-style: none;
+    margin: 18px auto 0;
+    padding: 0;
+    display: inline-flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .hero__myths li {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 11px 5px 8px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--bg-elev);
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg);
+    line-height: 1;
+  }
+  .hero__myths-num {
+    font-size: 10.5px;
+    color: var(--accent-strong);
+    letter-spacing: 0.04em;
+  }
+  .hero__myths-name { letter-spacing: 0.02em; }
+
+  .hero__ctas {
+    margin-top: 18px;
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 44px;
+    padding: 0 18px;
+    border-radius: 8px;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.005em;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease, border-color 120ms ease, transform 80ms ease;
+    border: 1px solid transparent;
+    white-space: nowrap;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn--primary {
+    background: var(--btn-primary-bg);
+    color: var(--btn-primary-fg);
+    border-color: var(--btn-primary-bg);
+  }
+  .btn--primary:hover { filter: brightness(1.06); }
+  .btn--ghost {
+    background: transparent;
+    color: var(--fg);
+    border-color: var(--border);
+  }
+  .btn--ghost:hover { border-color: var(--fg-mute); color: var(--fg-strong); }
+  .btn .arrow { transition: transform 120ms ease; }
+  .btn:hover .arrow { transform: translateX(2px); }
+
+  /* Tiny meta strip under CTAs */
+  .hero__meta {
+    margin-top: 18px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg-faint);
+    text-align: center;
+  }
+  .hero__meta-row {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    line-height: 1;
+  }
+  .hero__meta-label {
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--fg-mute);
+  }
+  .hero__meta-sep {
+    color: var(--fg-faint);
+    opacity: 0.55;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    font-size: 11px;
+    letter-spacing: 0;
+    line-height: 1;
+    color: var(--fg);
+    background: var(--bg-elev);
+  }
+  .chip--active {
+    color: var(--accent-strong);
+    border-color: color-mix(in oklab, var(--accent-strong) 50%, var(--border));
+    background: color-mix(in oklab, var(--accent-strong) 10%, var(--bg-elev));
+  }
+  .chip--ghost {
+    border-style: dashed;
+    color: var(--fg-mute);
+    background: transparent;
+    font-style: italic;
+  }
+  .hero__meta .dot {
+    width: 4px; height: 4px; border-radius: 50%;
+    background: var(--fg-faint);
+  }
+  .hero__meta .live {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 0 var(--accent);
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+  /* The live dot is ornament; hide it when ornament is fully off. */
+  :root[data-ornament="low"] .hero__meta .live { animation: none; box-shadow: none; opacity: 0.4; }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 60%, transparent); }
+    50%      { box-shadow: 0 0 0 6px color-mix(in oklab, var(--accent) 0%, transparent); }
+  }
+
+  /* ─── Section divider ───────────────────────────────────────────────── */
+  .section {
+    padding: 0;
+  }
+  .section__eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 18px;
+    position: relative;
+    display: inline-block;
+  }
+  /* Greek-key motif behind the eyebrow at high ornament. */
+  :root[data-ornament="high"] .section__eyebrow::before {
+    content: "";
+    position: absolute;
+    left: -36px; top: 50%; transform: translateY(-50%);
+    width: 28px; height: 10px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 10'><path d='M0 0 H28 V10 H22 V4 H16 V8 H10 V2 H4 V10 H0 Z' fill='none' stroke='%23637f80' stroke-width='1'/></svg>");
+    background-repeat: repeat-x;
+    opacity: 0.7;
+  }
+  .section__title {
+    font-family: var(--headline-family);
+    font-size: clamp(28px, 3.4vw, 40px);
+    font-weight: var(--headline-weight);
+    line-height: 1.1;
+    letter-spacing: var(--headline-tracking);
+    text-transform: var(--headline-transform);
+    color: var(--fg-strong);
+    margin: 0 0 24px;
+    max-width: 22ch;
+    text-wrap: balance;
+  }
+  :root[data-voice="inscription"] .section__title { letter-spacing: 0.14em; line-height: 1.25; }
+  .section__body {
+    font-size: 18px;
+    line-height: 1.65;
+    color: var(--fg-soft);
+    max-width: 64ch;
+    text-wrap: pretty;
+  }
+  .section__body strong { color: var(--fg-strong); font-weight: 500; }
+  .section__body code {
+    font-family: var(--mono);
+    font-size: 0.92em;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    color: var(--fg);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+
+  /* ─── Three myths grid (section 3) ──────────────────────────────────── */
+  .myths {
+    margin-top: 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  @media (max-width: 980px) { .myths { grid-template-columns: 1fr; } }
+
+  .myth {
+    background: var(--bg);
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    transition: background 200ms ease;
+    text-decoration: none;
+    color: inherit;
+    position: relative;
+  }
+  .myth:hover { background: var(--bg-elev); }
+
+  /* ─── Install (section 4) ───────────────────────────────────────────── */
+  .install-grid {
+    margin-top: 0;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    align-items: start;
+  }
+  @media (max-width: 920px) { .install-grid { grid-template-columns: 1fr; } }
+    grid-template-columns: 1.1fr 1fr;
+    gap: 32px;
+    align-items: start;
+  }
+  @media (max-width: 920px) { .install-grid { grid-template-columns: 1fr; } }
+
+  .codeblock {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg-elev);
+    overflow: hidden;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.7;
+  }
+  .codeblock__chrome {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: color-mix(in oklab, var(--bg) 70%, var(--bg-elev));
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--fg-faint);
+  }
+  .codeblock__copy {
+    appearance: none;
+    background: transparent;
+    color: var(--fg-mute);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font: inherit;
+    cursor: pointer;
+    transition: border-color 120ms ease, color 120ms ease;
+  }
+  .codeblock__copy:hover { color: var(--fg); border-color: var(--fg-mute); }
+  .codeblock__copy[data-copied="1"] { color: var(--accent-strong); border-color: var(--accent); }
+
+  /* Typewriter animation for install snippet */
+  .typewriter .tw-line {
+    display: block;
+    visibility: hidden;
+  }
+  .typewriter .tw-line.tw-active,
+  .typewriter .tw-line.tw-done {
+    visibility: visible;
+  }
+  .typewriter .tw-line.tw-active::after {
+    content: "";
+    display: inline-block;
+    width: 0.55ch;
+    height: 1.05em;
+    margin-left: 1px;
+    vertical-align: -0.18em;
+    background: var(--accent-strong, currentColor);
+    animation: tw-blink 850ms steps(2, end) infinite;
+  }
+  .typewriter.tw-finished .tw-line:last-child::after {
+    content: "";
+    display: inline-block;
+    width: 0.55ch;
+    height: 1.05em;
+    margin-left: 1px;
+    vertical-align: -0.18em;
+    background: var(--accent-strong, currentColor);
+    animation: tw-blink 850ms steps(2, end) infinite;
+  }
+  @keyframes tw-blink {
+    0%, 50% { opacity: 1; }
+    50.01%, 100% { opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .typewriter .tw-line { visibility: visible; }
+    .typewriter .tw-line::after { display: none !important; }
+  }
+  .codeblock pre {
+    margin: 0;
+    padding: 12px 14px;
+    overflow-x: auto;
+    color: var(--fg);
+    font-size: 12px;
+  }
+  /* Tiny hand-rolled syntax token classes. */
+  .tok-c { color: var(--fg-faint); font-style: italic; } /* comment */
+  .tok-k { color: var(--accent-strong); }                /* keyword/cmd */
+  .tok-s { color: #c8b896; }                             /* string-ish (warm) */
+  .tok-v { color: var(--fg); }                           /* var/path */
+  .tok-p { color: var(--fg-mute); }                      /* punctuation */
+  :root[data-atmosphere="parchment"] .tok-s { color: #6b5a35; }
+  :root[data-atmosphere="vellum"]    .tok-s { color: #e0b878; }
+
+  .install-aside {
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--fg-soft);
+  }
+  .install-aside h3 {
+    margin: 0 0 4px;
+    font-family: var(--mono);
+    font-weight: 500;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--fg-mute);
+  }
+  .install-aside ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .install-aside__hint {
+    margin: 0 0 10px;
+    font-size: 11.5px;
+    line-height: 1.55;
+    color: var(--fg-mute);
+  }
+  .install-aside__hint code {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 1px 5px;
+    border: 1px solid var(--bg-rule);
+    border-radius: 4px;
+    background: var(--bg-soft);
+    color: var(--fg);
+  }
+  .install-aside li {
+    padding: 6px 0;
+    border-top: 1px solid var(--bg-rule);
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--fg);
+  }
+  .install-aside li:first-child { border-top: 0; }
+  .cmd-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .cmd-icon {
+    flex: none;
+    width: 14px;
+    height: 14px;
+    color: var(--accent-strong, currentColor);
+    opacity: 0.85;
+  }
+  .cmd-name { flex: 1; min-width: 0; }
+  .install-aside li span.cmd-desc {
+    display: block;
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--fg-mute);
+    margin-top: 4px;
+    margin-left: 22px;
+    letter-spacing: 0;
+  }
+
+  details.install-extra {
+    margin-top: 24px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg-elev);
+    overflow: hidden;
+  }
+  details.install-extra summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 14px 18px;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--fg);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  details.install-extra summary::-webkit-details-marker { display: none; }
+  details.install-extra summary::after {
+    content: "+";
+    color: var(--fg-mute);
+    font-size: 16px;
+    line-height: 1;
+    transition: transform 200ms ease;
+  }
+  details.install-extra[open] summary::after { transform: rotate(45deg); }
+  details.install-extra .codeblock {
+    border: 0;
+    border-top: 1px solid var(--border);
+    border-radius: 0;
+  }
+  details.install-extra .codeblock__chrome { display: none; }
+
+  /* ─── Philosophy (section 6) ────────────────────────────────────────── */
+  .philosophy {
+    margin-top: 40px;
+    list-style: none;
+    padding: 0;
+    margin-left: 0;
+    counter-reset: phi;
+  }
+  .philosophy li {
+    counter-increment: phi;
+    display: grid;
+    grid-template-columns: 64px 1fr;
+    gap: 28px;
+    padding: 28px 0;
+    border-top: 1px solid var(--bg-rule);
+    align-items: baseline;
+  }
+  .philosophy li:first-child { border-top: 0; padding-top: 0; }
+  .philosophy li::before {
+    content: counter(phi, decimal-leading-zero);
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+    padding-top: 4px;
+  }
+  .philosophy h3 {
+    margin: 0 0 8px;
+    font-family: var(--headline-family);
+    font-weight: var(--headline-weight);
+    font-size: 22px;
+    line-height: 1.25;
+    letter-spacing: var(--headline-tracking);
+    text-transform: var(--headline-transform);
+    color: var(--fg-strong);
+  }
+  .philosophy p {
+    margin: 0;
+    font-size: 16px;
+    line-height: 1.65;
+    color: var(--fg-soft);
+    max-width: 60ch;
+    text-wrap: pretty;
+  }
+  .philosophy code {
+    font-family: var(--mono);
+    font-size: 0.9em;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    color: var(--fg);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  /* ─── Footer (section 7) ────────────────────────────────────────────── */
+  .site-footer {
+    border-top: 1px solid var(--bg-rule);
+    padding: 14px 0;
+    margin-top: 0;
+  }
+  .site-footer__inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg-faint);
+  }
+  @media (max-width: 720px) {
+    .site-footer__inner { flex-direction: column; align-items: flex-start; }
+  }
+  .footer__copy { letter-spacing: 0.02em; }
+  .footer__links {
+    display: flex;
+    gap: 18px;
+  }
+  .footer__links a {
+    color: var(--fg-mute);
+    text-decoration: none;
+  }
+  .footer__links a:hover { color: var(--accent-strong); }
+</style>
+</head>
+<body data-cc-id="cc-1" style="cursor: crosshair;">
+
+<div class="viewport">
+<main id="top">
+  <!-- TOP: full-width banner -->
+  <div class="banner-row">
+    <div class="hero__banner-wrap">
+      <img class="hero__banner" src="assets/daedalus-banner.gif" alt="Daedalus — Agents that fly. Workflows that don't melt. A Hermes Agent plugin · reads issues, writes PRs." width="1200" height="400">
+    </div>
+  </div>
+
+  <div class="split">
+
+    <!-- LEFT: install -->
+    <div class="split__right">
+
+      <div class="install-grid" id="install">
+        <div class="codeblock">
+          <div class="codeblock__chrome">
+            <span>$ bash</span>
+            <button class="codeblock__copy" type="button" data-copy-target="install-snippet">Copy</button>
+          </div>
+<pre id="install-snippet" class="typewriter" aria-label="Daedalus install commands"><span class="tw-line"><span class="tok-c"># one-liner: clone, install, launch</span></span><span class="tw-line"><span class="tok-k">curl</span> -fsSL <span class="tok-s">https://raw.githubusercontent.com/attmous/daedalus/main/scripts/bootstrap.sh</span> | <span class="tok-k">bash</span></span><span class="tw-line"><span class="tok-k">hermes</span></span></pre>
+        </div>
+
+        <aside class="install-aside">
+          <h3>Inside Hermes</h3>
+          <p class="install-aside__hint">Slash commands available once <code>hermes</code> is running.</p>
+          <ul>
+            <li>
+              <div class="cmd-row">
+                <svg class="cmd-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 8h2.5l1.5-3.5 2.5 7 1.5-3.5h2.5l1-2 1 2H14.5"/></svg>
+                <span class="cmd-name">/daedalus status</span>
+              </div>
+              <span class="cmd-desc">What's running, what's wedged.</span>
+            </li>
+            <li>
+              <div class="cmd-row">
+                <svg class="cmd-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 5v6M5 8h6"/></svg>
+                <span class="cmd-name">/daedalus doctor</span>
+              </div>
+              <span class="cmd-desc">Diagnostic. JSON.</span>
+            </li>
+            <li>
+              <div class="cmd-row">
+                <svg class="cmd-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4h7M2 8h12M2 12h5"/></svg>
+                <span class="cmd-name">/workflow code-review status</span>
+              </div>
+              <span class="cmd-desc">Per-lane breakdown.</span>
+            </li>
+            <li>
+              <div class="cmd-row">
+                <svg class="cmd-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3l5 5-5 5"/></svg>
+                <span class="cmd-name">/workflow code-review tick</span>
+              </div>
+              <span class="cmd-desc">Advance now.</span>
+            </li>
+          </ul>
+        </aside>
+      </div>
+
+    </div>
+
+    <!-- RIGHT: hero text -->
+    <section class="hero" data-cc-id="cc-4">
+
+      <div class="hero__copy" data-cc-id="cc-3">
+
+        <h1 class="hero__tagline" data-cc-id="cc-2" style="">
+          Three myths, one engine
+        </h1>
+
+
+        <p class="hero__subtitle" data-cc-id="cc-6" style="">
+          Daedalus built the Labyrinth. Gave Theseus a way out. Warned Icarus.
+          <br><strong data-cc-id="cc-5" style="">This one does all three.</strong>
+        </p>
+
+        <ul class="hero__myths" aria-label="The three myths">
+          <li><span class="hero__myths-num">01</span><span class="hero__myths-name">thread</span></li>
+          <li><span class="hero__myths-num">02</span><span class="hero__myths-name">labyrinth</span></li>
+          <li><span class="hero__myths-num">03</span><span class="hero__myths-name">wings</span></li>
+        </ul>
+
+        <div class="hero__ctas">
+          <a class="btn btn--primary" href="https://github.com/attmous/daedalus" rel="noopener">
+            View on GitHub
+            <span class="arrow" aria-hidden="true">→</span>
+          </a>
+        </div>
+
+        <div class="hero__meta" aria-hidden="true">
+          <div class="hero__meta-row">
+            <span class="live"></span>
+            <span class="hero__meta-label">Hermes-Agent plugin</span>
+          </div>
+          <div class="hero__meta-row">
+            <span class="hero__meta-label">Workflows</span>
+            <span class="hero__meta-sep">/</span>
+            <span class="chip chip--active">code-review</span>
+            <span class="chip chip--ghost">more, soon ...</span>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="container site-footer__inner">
+    <div class="footer__copy">© 2026 Daedalus by ATTmous · MIT</div>
+    <div class="footer__links">
+      <a href="https://github.com/attmous/daedalus" rel="noopener">GitHub</a>
+      <a href="https://github.com/attmous/daedalus/blob/main/assets/CREDITS.md" rel="noopener">Credits</a>
+    </div>
+  </div>
+</footer>
+</div>
+
+<script>
+  // Copy button for the install snippet.
+  document.querySelectorAll('.codeblock__copy').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const target = document.getElementById(btn.dataset.copyTarget);
+      if (!target) return;
+      const text = target.innerText.trim();
+      try { await navigator.clipboard.writeText(text); } catch {}
+      btn.dataset.copied = '1';
+      btn.textContent = 'Copied';
+      setTimeout(() => {
+        delete btn.dataset.copied;
+        btn.textContent = 'Copy';
+      }, 1400);
+    });
+  });
+
+  // Typewriter for install snippet
+  (() => {
+    const pre = document.getElementById('install-snippet');
+    if (!pre || !pre.classList.contains('typewriter')) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      pre.querySelectorAll('.tw-line').forEach(l => l.classList.add('tw-done'));
+      pre.classList.add('tw-finished');
+      return;
+    }
+
+    // Snapshot each line: clone its child nodes for replay; clear visible content.
+    const lines = Array.from(pre.querySelectorAll('.tw-line')).map(line => {
+      const snapshot = Array.from(line.childNodes).map(n => n.cloneNode(true));
+      line.replaceChildren();
+      return { line, snapshot };
+    });
+
+    // Type one snapshot into a line, char by char.
+    async function typeLine({ line, snapshot }) {
+      line.classList.add('tw-active');
+      for (const node of snapshot) {
+        if (node.nodeType === Node.TEXT_NODE) {
+          // Append a fresh text node and grow it.
+          const t = document.createTextNode('');
+          line.appendChild(t);
+          for (const ch of node.textContent) {
+            t.data += ch;
+            await wait(charDelay(ch));
+          }
+        } else {
+          // Element (token span): clone empty, append, then fill its text content char-by-char.
+          const el = node.cloneNode(false);
+          line.appendChild(el);
+          // Recurse for nested text/elements.
+          await typeInto(el, node);
+        }
+      }
+      line.classList.remove('tw-active');
+      line.classList.add('tw-done');
+    }
+
+    async function typeInto(target, source) {
+      for (const child of source.childNodes) {
+        if (child.nodeType === Node.TEXT_NODE) {
+          const t = document.createTextNode('');
+          target.appendChild(t);
+          for (const ch of child.textContent) {
+            t.data += ch;
+            await wait(charDelay(ch));
+          }
+        } else {
+          const el = child.cloneNode(false);
+          target.appendChild(el);
+          await typeInto(el, child);
+        }
+      }
+    }
+
+    function charDelay(ch) {
+      // Slightly varied cadence; faster for spaces, occasional micro-pause on punctuation.
+      if (ch === ' ') return 8;
+      if (ch === '/' || ch === '.' || ch === '-' || ch === '&') return 28;
+      return 16 + Math.random() * 14;
+    }
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+
+    async function play() {
+      for (let i = 0; i < lines.length; i++) {
+        await typeLine(lines[i]);
+        if (i < lines.length - 1) await wait(260);
+      }
+      // After all lines done, leave a blinking caret on the last line.
+      const last = lines[lines.length - 1].line;
+      last.classList.add('tw-active');
+      pre.classList.add('tw-finished');
+    }
+
+    // Trigger on first reveal.
+    if ('IntersectionObserver' in window) {
+      const io = new IntersectionObserver((entries, obs) => {
+        entries.forEach(e => {
+          if (e.isIntersecting) { obs.disconnect(); setTimeout(play, 220); }
+        });
+      }, { threshold: 0.25 });
+      io.observe(pre);
+    } else {
+      setTimeout(play, 220);
+    }
+  })();
+</script>
+
+</body></html>
