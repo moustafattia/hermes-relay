@@ -55,11 +55,13 @@ def parse_and_validate(workflow_yaml_path: Path) -> ConfigSnapshot:
         raise ValidationError(f"schema validation failed: {exc.message}") from exc
 
     prompts = config.get("prompts") or {}
+    st = workflow_yaml_path.stat()
     return ConfigSnapshot(
         config=config,
         prompts=prompts,
         loaded_at=time.monotonic(),
-        source_mtime=workflow_yaml_path.stat().st_mtime,
+        source_mtime=st.st_mtime,
+        source_size=st.st_size,
     )
 
 
@@ -74,16 +76,14 @@ class ConfigWatcher:
 
     def __post_init__(self) -> None:
         snap = self.snapshot_ref.get()
-        # Seed with the real on-disk (mtime, size) so the first poll is a
-        # true no-op when nothing changed since the bootstrap parse. If
-        # the file vanished between bootstrap and watcher construction,
-        # fall back to the snapshot's mtime + size=-1 (next poll will
-        # reload as soon as the file reappears).
-        try:
-            st = self.workflow_yaml_path.stat()
-            self._last_key = (st.st_mtime, st.st_size)
-        except OSError:
-            self._last_key = (snap.source_mtime, -1)
+        # Codex P2 on PR #19: seed _last_key from the snapshot's recorded
+        # (mtime, size), NOT the live file. If workflow.yaml changed between
+        # bootstrap parse and watcher construction, the snapshot still holds
+        # the OLD config; seeding from the LIVE file would convince poll()
+        # the new bytes are "current" and the watcher would never reload
+        # until the next edit. Seeding from the snapshot's recorded values
+        # ensures the next poll detects the drift and reloads.
+        self._last_key = (snap.source_mtime, snap.source_size)
 
     def poll(self) -> None:
         """One tick of the watcher loop. Cheap when no change.
@@ -100,12 +100,22 @@ class ConfigWatcher:
         if key == self._last_key:
             return
 
+        # Codex P1 on PR #19: catch the full set of failures parse_and_validate
+        # can raise. OSError covers "file disappeared between stat() and
+        # read_text()", UnicodeDecodeError covers binary content / encoding
+        # mismatch, ParseError/ValidationError cover YAML syntax + schema.
+        # An uncaught exception here would propagate out of poll() and crash
+        # the watcher loop instead of preserving last-known-good config.
         try:
             new_snapshot = parse_and_validate(self.workflow_yaml_path)
-        except (ParseError, ValidationError) as exc:
+        except (ParseError, ValidationError, OSError, UnicodeDecodeError) as exc:
             self.emit_event(
                 "daedalus.config_reload_failed",
-                {"error": str(exc), "mtime": st.st_mtime, "size": st.st_size},
+                {
+                    "error": f"{type(exc).__name__}: {exc}",
+                    "mtime": st.st_mtime,
+                    "size": st.st_size,
+                },
             )
             self._last_key = key  # suppress retrying same broken bytes
             return
