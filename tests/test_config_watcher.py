@@ -121,3 +121,41 @@ def test_watcher_poll_no_change_is_noop(tmp_path):
     w.poll()
     assert ref.get() is initial
     assert events == []
+
+
+def test_watcher_poll_invalid_yaml_keeps_lkg_and_emits_failure(tmp_path):
+    import os
+    from workflows.code_review.config_snapshot import AtomicRef
+    from workflows.code_review.config_watcher import ConfigWatcher
+
+    p, initial = _seed_snapshot(tmp_path)
+    ref = AtomicRef(initial)
+    events: list[tuple[str, dict]] = []
+    w = ConfigWatcher(p, ref, lambda t, d: events.append((t, d)))
+
+    p.write_text("workflow: [unclosed\n")
+    os.utime(p, (initial.source_mtime + 5, initial.source_mtime + 5))
+
+    w.poll()
+    assert ref.get() is initial
+    assert any(t == "daedalus.config_reload_failed" for t, _ in events)
+
+
+def test_watcher_poll_schema_invalid_keeps_lkg_and_emits_failure(tmp_path):
+    import os
+    from workflows.code_review.config_snapshot import AtomicRef
+    from workflows.code_review.config_watcher import ConfigWatcher
+
+    p, initial = _seed_snapshot(tmp_path)
+    ref = AtomicRef(initial)
+    events: list[tuple[str, dict]] = []
+    w = ConfigWatcher(p, ref, lambda t, d: events.append((t, d)))
+
+    p.write_text("workflow: code-review\n")  # schema-invalid (missing required fields)
+    os.utime(p, (initial.source_mtime + 5, initial.source_mtime + 5))
+
+    w.poll()
+    assert ref.get() is initial
+    failures = [d for t, d in events if t == "daedalus.config_reload_failed"]
+    assert len(failures) == 1
+    assert "schema validation" in failures[0]["error"]
