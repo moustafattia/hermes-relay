@@ -81,6 +81,11 @@ class ClaudeCliRuntime:
             "--print",
             prompt,
         ]
+        # Codex P1 on PR #18: record activity BEFORE the blocking call so
+        # stall reconciliation measures from "work started", not from "previous
+        # work ended". Otherwise a long-running invocation looks idle for its
+        # entire runtime and gets force-killed once stall.timeout_ms passes.
+        self._record_activity()
         completed = self._run(cmd, cwd=worktree, timeout=self._timeout)
         self._record_activity()
         return getattr(completed, "stdout", "") or ""
@@ -107,6 +112,7 @@ class ClaudeCliRuntime:
         env: dict | None = None,
     ) -> str:
         """Execute a fully-formed argv via the configured timeout."""
+        self._record_activity()
         completed = self._run(command_argv, cwd=worktree, timeout=self._timeout)
         self._record_activity()
         return getattr(completed, "stdout", "") or ""

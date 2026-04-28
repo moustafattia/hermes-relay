@@ -57,6 +57,48 @@ def test_hermes_agent_runtime_updates_last_activity_on_callback():
     assert rt.last_activity_ts() is not None
 
 
+def test_claude_cli_records_activity_before_run_returns(tmp_path):
+    """Codex P1 on PR #18: long-running invocations must not look idle.
+
+    The fix is to call _record_activity() BEFORE the blocking _run() call
+    so stall reconciliation measures from "work started", not from "previous
+    work ended". This test exercises that ordering by inspecting the
+    activity timestamp from inside the run callback.
+    """
+    import time
+    from workflows.code_review.runtimes.claude_cli import ClaudeCliRuntime
+
+    captured: dict[str, float | None] = {}
+
+    class _FakeCompleted:
+        stdout = ""
+
+    def fake_run(cmd, cwd, timeout):
+        # Emulates the agent process being invoked. By this point the
+        # runtime should ALREADY have recorded activity so a concurrent
+        # stall reconciler observes the work as fresh.
+        captured["mid_run_ts"] = rt.last_activity_ts()
+        return _FakeCompleted()
+
+    rt = ClaudeCliRuntime(
+        {"kind": "claude-cli", "max-turns-per-invocation": 1, "timeout-seconds": 60},
+        run=fake_run, run_json=None,
+    )
+    assert rt.last_activity_ts() is None
+
+    before = time.monotonic()
+    rt.run_prompt(worktree=tmp_path, session_name="x", prompt="hi", model="m")
+    after = time.monotonic()
+
+    mid = captured["mid_run_ts"]
+    assert mid is not None, (
+        "Activity timestamp must be set BEFORE _run() is called. "
+        "Otherwise stall reconciliation can't see the worker as live "
+        "until the (potentially long) invocation completes."
+    )
+    assert before <= mid <= after
+
+
 @dataclass
 class _FakeRuntime:
     last_ts: float | None

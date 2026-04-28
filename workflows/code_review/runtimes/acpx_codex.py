@@ -99,6 +99,9 @@ class AcpxCodexRuntime:
             session_name,
             prompt,
         ]
+        # Codex P1 on PR #18: record activity BEFORE the blocking run so a
+        # long-running invocation isn't classified as stalled mid-flight.
+        self._record_activity()
         completed = self._run(cmd, cwd=worktree)
         self._record_activity()
         return getattr(completed, "stdout", "") or ""
