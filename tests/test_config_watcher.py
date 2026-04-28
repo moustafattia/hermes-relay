@@ -159,3 +159,24 @@ def test_watcher_poll_schema_invalid_keeps_lkg_and_emits_failure(tmp_path):
     failures = [d for t, d in events if t == "daedalus.config_reload_failed"]
     assert len(failures) == 1
     assert "schema validation" in failures[0]["error"]
+
+
+def test_watcher_poll_does_not_re_emit_for_same_broken_mtime(tmp_path):
+    import os
+    from workflows.code_review.config_snapshot import AtomicRef
+    from workflows.code_review.config_watcher import ConfigWatcher
+
+    p, initial = _seed_snapshot(tmp_path)
+    ref = AtomicRef(initial)
+    events: list[tuple[str, dict]] = []
+    w = ConfigWatcher(p, ref, lambda t, d: events.append((t, d)))
+
+    p.write_text("workflow: [unclosed\n")
+    os.utime(p, (initial.source_mtime + 5, initial.source_mtime + 5))
+
+    w.poll()
+    w.poll()
+    w.poll()
+
+    failures = [t for t, _ in events if t == "daedalus.config_reload_failed"]
+    assert len(failures) == 1  # only the first tick re-attempted parsing
