@@ -180,3 +180,32 @@ def test_watcher_poll_does_not_re_emit_for_same_broken_mtime(tmp_path):
 
     failures = [t for t, _ in events if t == "daedalus.config_reload_failed"]
     assert len(failures) == 1  # only the first tick re-attempted parsing
+
+
+def test_watcher_poll_detects_size_change_at_same_mtime(tmp_path):
+    """Bytes changed but mtime preserved (e.g. rsync -t). Must reload."""
+    import os
+    from workflows.code_review.config_snapshot import AtomicRef
+    from workflows.code_review.config_watcher import ConfigWatcher
+
+    p, initial = _seed_snapshot(tmp_path)
+    ref = AtomicRef(initial)
+    events: list[tuple[str, dict]] = []
+    w = ConfigWatcher(p, ref, lambda t, d: events.append((t, d)))
+
+    # Force first poll to record current key
+    w.poll()
+    events.clear()
+
+    # Rewrite with longer content but force-restore the original mtime
+    new_yaml = p.read_text() + "\n# trailing comment to bump size\n"
+    original_mtime = p.stat().st_mtime
+    p.write_text(new_yaml)
+    os.utime(p, (original_mtime, original_mtime))
+
+    # mtime is unchanged but size grew. Watcher must still re-parse.
+    w.poll()
+
+    reloads = [t for t, _ in events if t == "daedalus.config_reloaded"]
+    assert len(reloads) == 1, f"Expected size-change to trigger reload, got events={events}"
+    assert ref.get() is not initial  # snapshot replaced
