@@ -4,7 +4,7 @@
 
 <br>
 
-**Conducts every labeled issue all the way through your workflow.**
+**A Hermes-Agent plugin. Reads issues, writes PRs**
 
 *Daedalus built the Labyrinth, gave Theseus the thread, and warned Icarus not to fly too close to the sun.*
 
