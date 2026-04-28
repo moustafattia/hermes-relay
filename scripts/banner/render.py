@@ -63,29 +63,35 @@ def render_frame(scene: Scene, f: int) -> Image.Image:
     im.paste(scene.bust, (scene.bust_pos["x"], scene.bust_pos["y"]),
              scene.bust)
 
-    # 4. brushstroke across the eyes
-    bp = timeline.brush_progress(f)
-    if bp > 0:
-        brushstroke.draw(
-            im,
-            scene.bust_pos["eye_x1"], scene.bust_pos["eye_y"] - 22,
-            scene.bust_pos["eye_x2"], scene.bust_pos["eye_y"] + 22,
-            bp,
-        )
+    # 4. brushstroke across the eyes — only meaningful for the bust photo
+    # (the engraving has no eyes to "censor"; brushstroke would just
+    # bisect the artwork). Skip in engraving mode.
+    if config.BUST_BG_KIND == "photo":
+        bp = timeline.brush_progress(f)
+        if bp > 0:
+            brushstroke.draw(
+                im,
+                scene.bust_pos["eye_x1"], scene.bust_pos["eye_y"] - 22,
+                scene.bust_pos["eye_x2"], scene.bust_pos["eye_y"] + 22,
+                bp,
+            )
 
-    # 5. code overlays (each on its own RGBA layer for clean alpha)
+    # 5. code overlays (each on its own RGBA layer for clean alpha).
+    # Anchored relative to the hero image's left edge so they sit next
+    # to it without overlap regardless of the hero's width.
     code_layer = Image.new("RGBA", (config.W, config.H), (0, 0, 0, 0))
     cd = ImageDraw.Draw(code_layer)
     bx = scene.bust_pos["x"]
+    code_x = bx - 320
     code_overlays.draw_block(cd, code_overlays.AGENTS_BLOCK,
-                             bx - 290, 30,
+                             code_x, 50,
                              typography.code(), timeline.code_alpha(f, 0))
     code_overlays.draw_block(cd, code_overlays.GITHUB_BLOCK,
-                             bx - 320, 145,
+                             code_x, 165,
                              typography.code_small(),
                              timeline.code_alpha(f, 1))
     code_overlays.draw_block(cd, code_overlays.TURNLOG_BLOCK,
-                             bx - 280, 230,
+                             code_x, 250,
                              typography.code_small(),
                              timeline.code_alpha(f, 2))
     im.paste(code_layer, (0, 0), code_layer)

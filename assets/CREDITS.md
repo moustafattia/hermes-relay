@@ -11,6 +11,20 @@
 The subject of the bust is Plato; we use it as a generic "classical wise craftsman"
 stand-in for Daedalus — there is no canonical surviving bust of Daedalus himself.
 
+## Daedalus emblem — `source/daedalus-emblem.jpg`
+
+- **Subject:** "Iuvat evasisse" — Daedalus mid-flight above the labyrinth (his own creation), with the Latin motto from Virgil ("it pleased him to have escaped") in the cartouche. Engraved emblem.
+- **Source:** [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Daedalus_escapes_(iuvat_evasisse).jpg)
+- **Status:** Public domain (engraving from c. 1670s).
+- **Used in:** `assets/daedalus-banner.gif` as the right-side hero illustration — wings AND labyrinth in one image, perfectly on-theme.
+
+## Daedalus + Icarus engraving (alternate) — `source/daedalus-icarus.png`
+
+- **Subject:** Daedalus crafting wings while Icarus stands ready, line engraving by J. Williamson.
+- **Source:** [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Daedalus-and-icarus.png)
+- **Status:** Public domain.
+- **Used in:** Vendored as an alternative hero option — switch `BUST_SRC` in `scripts/banner/config.py` to use it.
+
 ## Caduceus illustration — `source/caduceus.jpg`
 
 - **Subject:** Caduceus (Hermes's herald wand) — line-art drawing.
