@@ -4,7 +4,7 @@
 
 <br>
 
-**A Hermes-Agent plugin. Reads issues, writes PRs**
+**A Hermes Agent plugin. Reads issues, writes PRs**
 
 *Daedalus built the Labyrinth, gave Theseus the thread, and warned Icarus not to fly too close to the sun.*
 
