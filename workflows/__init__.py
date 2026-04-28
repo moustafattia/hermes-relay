@@ -97,8 +97,77 @@ def run_cli(
             f"supported: {list(module.SUPPORTED_SCHEMA_VERSIONS)}"
         )
 
+    # Symphony §6.3 dispatch preflight. If the loaded workflow module
+    # exposes ``run_preflight``, call it before dispatch — but only for
+    # commands the workflow declares as dispatch-gated. Codex P1 on
+    # PR #21: gating ALL commands prevents operators from running
+    # diagnostic / repair commands when the config is unhealthy, which
+    # is exactly when those commands are needed.
+    #
+    # NOTE on reconciliation: Symphony §6.3 says preflight failure must
+    # not block reconciliation. Daedalus's tick is a one-shot CLI
+    # invocation, so reconciliation across CLI invocations is naturally
+    # preserved by the next invocation re-running successfully once the
+    # config is fixed. Within a single invocation, dispatch is aborted —
+    # the structured event-log trail is the operator-visible signal.
+    preflight_fn = getattr(module, "run_preflight", None)
+    gated_commands = getattr(module, "PREFLIGHT_GATED_COMMANDS", None)
+    invoked_command = argv[0] if argv else None
+    should_gate = (
+        callable(preflight_fn)
+        and gated_commands is not None
+        and invoked_command in gated_commands
+    )
+    if should_gate:
+        result = preflight_fn(cfg)
+        if not getattr(result, "ok", True):
+            _emit_dispatch_skipped_event(
+                workflow_root=workflow_root,
+                workflow_name=workflow_name,
+                error_code=getattr(result, "error_code", None),
+                error_detail=getattr(result, "error_detail", None),
+            )
+            raise WorkflowContractError(
+                f"dispatch preflight failed for workflow {workflow_name!r}: "
+                f"code={result.error_code} detail={result.error_detail}"
+            )
+
     workspace = module.make_workspace(workflow_root=workflow_root, config=cfg)
     return module.cli_main(workspace, argv)
+
+
+def _emit_dispatch_skipped_event(
+    *,
+    workflow_root: Path,
+    workflow_name: str,
+    error_code: str | None,
+    error_detail: str | None,
+) -> None:
+    """Append a ``daedalus.dispatch_skipped`` event to the workflow event log.
+
+    Best-effort: silently swallows I/O errors so a broken event log path
+    cannot mask the underlying preflight failure that the caller is about
+    to surface as a WorkflowContractError.
+    """
+    try:
+        # Imported lazily to avoid pulling code_review-specific paths into the
+        # generic dispatcher's import graph at module load time.
+        from workflows.code_review.paths import runtime_paths
+        import runtime as _runtime
+
+        paths = runtime_paths(workflow_root)
+        event = {
+            "event": "daedalus.dispatch_skipped",
+            "workflow": workflow_name,
+            "code": error_code,
+            "detail": error_detail,
+        }
+        _runtime.append_daedalus_event(
+            event_log_path=paths["event_log_path"], event=event
+        )
+    except Exception:
+        # Best-effort: never let event-log failures shadow the preflight error.
+        pass
 
 
 def list_workflows() -> list[str]:
