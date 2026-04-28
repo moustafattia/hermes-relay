@@ -433,3 +433,65 @@ def test_serve_subcommand_binds_and_serves(tmp_path: Path) -> None:
     finally:
         handle.shutdown()
     done.wait(timeout=5)
+
+
+def test_read_events_tail_is_bounded_by_limit_not_file_size(tmp_path):
+    """Codex P2 on PR #22: tail read must be O(limit) not O(file_size).
+
+    Build a large events log (10_000 entries), call _read_events_tail
+    with limit=20, assert correct content + reasonable read size budget.
+    """
+    import json
+    import os
+    from workflows.code_review.server.views import _read_events_tail
+
+    log = tmp_path / "events.jsonl"
+    with log.open("w") as fh:
+        for i in range(10_000):
+            fh.write(json.dumps({"event_type": "x", "i": i}) + "\n")
+
+    # Read with limit=20 and verify newest-first ordering.
+    out = _read_events_tail(log, limit=20)
+    assert len(out) == 20
+    assert out[0]["i"] == 9999
+    assert out[19]["i"] == 9980
+
+    # Sanity: the file is large (~250+ KB at 25-byte avg). The function
+    # should not have loaded the whole thing. We can't introspect the
+    # internal seeks, but we can at least assert that the result is
+    # correct and the function returns quickly. The real correctness
+    # check is the output ordering above.
+    assert log.stat().st_size > 100_000
+
+
+def test_refresh_controller_uses_workflow_cli_argv(tmp_path, monkeypatch):
+    """Codex P1 on PR #22: refresh must use workflow_cli_argv (plugin
+    entrypoint), not -m workflows.code_review which fails in script-form
+    deployments where workflows isn't on the child's sys.path.
+    """
+    captured: dict[str, list[str]] = {}
+
+    def fake_popen(argv, **kwargs):
+        captured["argv"] = list(argv)
+
+        class _FakeProc:
+            pass
+
+        return _FakeProc()
+
+    from workflows.code_review.server import refresh as refresh_mod
+    monkeypatch.setattr(refresh_mod.subprocess, "Popen", fake_popen)
+
+    rc = refresh_mod.RefreshController(tmp_path)
+    assert rc.trigger() is True
+
+    argv = captured.get("argv", [])
+    # Must NOT contain "-m workflows.code_review" — that's the broken form.
+    joined = " ".join(argv)
+    assert "-m workflows.code_review" not in joined, (
+        f"refresh argv uses module-form which breaks in installed script "
+        f"deployments. argv={argv}"
+    )
+    # Must include the tick subcommand and the workflow_root.
+    assert "tick" in argv
+    assert str(tmp_path) in argv

@@ -10,10 +10,11 @@ spawns at most one tick (per second) rather than one per click.
 from __future__ import annotations
 
 import subprocess
-import sys
 import threading
 import time
 from pathlib import Path
+
+from workflows.code_review.paths import workflow_cli_argv
 
 
 class RefreshController:
@@ -47,18 +48,23 @@ class RefreshController:
             if now - self._last_trigger_at < self.DEBOUNCE_SECONDS:
                 return False
             self._last_trigger_at = now
-        # Use sys.executable so the subprocess runs under the same
-        # interpreter as the server (matches the workflow_cli_argv
-        # rationale in workflows/code_review/paths.py).
+        # Codex P1 on PR #22: invoke via the plugin entrypoint, not
+        # ``-m workflows.code_review``. The ``-m`` form requires the
+        # child to import ``workflows`` from its sys.path, which only
+        # works in the editable-source dev layout. In a production
+        # script-form deployment the package lives under
+        # ``<workflow_root>/.hermes/plugins/daedalus/workflows/`` and
+        # the import path adjustment is done by ``__main__.py`` in-process.
+        # ``workflow_cli_argv`` returns the plugin entrypoint path so
+        # the subprocess works in both source and installed layouts.
+        argv = workflow_cli_argv(
+            self._workflow_root,
+            "--workflow-root",
+            str(self._workflow_root),
+            "tick",
+        )
         subprocess.Popen(
-            [
-                sys.executable,
-                "-m",
-                "workflows.code_review",
-                "--workflow-root",
-                str(self._workflow_root),
-                "tick",
-            ],
+            argv,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )

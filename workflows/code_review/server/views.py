@@ -38,24 +38,72 @@ def _now_iso() -> str:
 
 
 def _read_events_tail(events_log_path: Path, limit: int) -> list[dict[str, Any]]:
+    """Return up to ``limit`` most recent JSONL events, newest first.
+
+    Codex P2 on PR #22: a previous implementation called ``readlines()``
+    which loads the entire file before truncating. Since this is called
+    on every HTTP request, request cost grew with total log size — a
+    long-lived ``daedalus-events.jsonl`` caused avoidable latency and
+    memory spikes. Now reads from the END via seek + chunked reverse
+    scan, so cost is bounded by ``limit`` (plus average line length)
+    regardless of total file size.
+    """
     if not events_log_path.exists():
         return []
     try:
-        with open(events_log_path, "r", encoding="utf-8") as fh:
-            lines = fh.readlines()
+        size = events_log_path.stat().st_size
     except OSError:
         return []
+    if size == 0:
+        return []
+    # Read 8 KiB chunks from the tail until we've collected ``limit`` newlines
+    # or hit BOF. A line is at most one parsed event; non-JSON / empty lines
+    # don't count toward limit so they're ignored when assembling the result.
+    chunk_size = 8192
+    collected: list[bytes] = []
+    pending = b""
+    pos = size
+    found_lines = 0
+    try:
+        with open(events_log_path, "rb") as fh:
+            while pos > 0 and found_lines <= limit:
+                read_size = min(chunk_size, pos)
+                pos -= read_size
+                fh.seek(pos)
+                chunk = fh.read(read_size)
+                pending = chunk + pending
+                # Split on \n; everything except the very first slice (which
+                # may be the start of an unfinished line) is a complete line.
+                # When pos reaches 0 the very first slice is also a complete
+                # line (no preceding bytes can extend it).
+                parts = pending.split(b"\n")
+                # Keep the first chunk as "potentially incomplete" until we
+                # read more from earlier in the file (pos > 0).
+                if pos > 0:
+                    pending = parts[0]
+                    complete = parts[1:]
+                else:
+                    pending = b""
+                    complete = parts
+                # complete is in file-order; we want newest first. Iterate in
+                # reverse so we collect the latest lines first.
+                for line in reversed(complete):
+                    if not line:
+                        continue
+                    collected.append(line)
+                    found_lines += 1
+                    if found_lines >= limit:
+                        break
+    except OSError:
+        return []
+
     out: list[dict[str, Any]] = []
-    for line in lines[-limit:]:
-        line = line.strip()
-        if not line:
-            continue
+    for raw in collected[:limit]:
         try:
-            out.append(json.loads(line))
-        except json.JSONDecodeError:
+            out.append(json.loads(raw.decode("utf-8")))
+        except (json.JSONDecodeError, UnicodeDecodeError):
             continue
-    out.reverse()  # newest first
-    return out
+    return out  # already newest first
 
 
 def _query_active_lanes(db_path: Path) -> list[dict[str, Any]]:
