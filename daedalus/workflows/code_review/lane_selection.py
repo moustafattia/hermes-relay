@@ -1,8 +1,8 @@
 """Lane-selection config parser.
 
 Synthesizes a fully-populated config dict from the (optional) ``lane-selection:``
-block in workflow.yaml. Defaults preserve current behavior exactly so workspaces
-without the block see no change in promotion semantics.
+block in the workflow contract. Defaults preserve current behavior exactly so
+workspaces without the block see no change in promotion semantics.
 """
 from __future__ import annotations
 

@@ -8,14 +8,14 @@ This is the supported community install path for the first public release.
 - Hermes with plugin loading enabled
 - `python3` with `yaml` and `jsonschema` available
 - `systemd --user` for supervised active/shadow mode
-- the host CLIs required by the runtimes named in `workflow.yaml`
+- the host CLIs required by the runtimes named in `WORKFLOW.md`
 
 The bundled `code-review` template defaults to:
 
 - `acpx-codex` for the coder runtime
 - `claude-cli` for the internal reviewer runtime
 
-If your host does not have those runtimes, edit `workflow.yaml` before starting the service.
+If your host does not have those runtimes, edit `WORKFLOW.md` before starting the service.
 
 ## Install the plugin
 
@@ -39,7 +39,29 @@ python3 -m pip install .
 hermes plugins enable daedalus
 ```
 
-## Scaffold a workflow root
+## Bootstrap a workflow root
+
+```bash
+cd /path/to/your/repo
+hermes daedalus bootstrap
+```
+
+This is the preferred path. `bootstrap`:
+
+- detects the git repo root from the current checkout
+- derives `github-slug` from `origin`
+- creates the supported instance layout below
+- writes a starter `WORKFLOW.md`
+- writes `./.hermes/daedalus/workflow-root` in the repo checkout so later
+  Daedalus commands can resolve the workflow root automatically
+
+```text
+~/.hermes/workflows/<owner>-<repo>-<workflow-type>/
+```
+
+## Manual scaffold path
+
+If you want explicit control over the target root or slug:
 
 ```bash
 hermes daedalus scaffold-workflow \
@@ -47,7 +69,7 @@ hermes daedalus scaffold-workflow \
   --github-slug your-org/your-repo
 ```
 
-This creates the supported instance layout:
+That creates the same supported instance layout:
 
 ```text
 ~/.hermes/workflows/<owner>-<repo>-<workflow-type>/
@@ -58,7 +80,7 @@ This creates the supported instance layout:
 Edit:
 
 ```text
-~/.hermes/workflows/<owner>-<repo>-<workflow-type>/config/workflow.yaml
+~/.hermes/workflows/<owner>-<repo>-<workflow-type>/WORKFLOW.md
 ```
 
 At minimum, set:
@@ -67,7 +89,29 @@ At minimum, set:
 - runtime kinds/models that exist on your host
 - any gates, webhooks, or observability settings your repo needs
 
-## Initialize and verify
+The YAML front matter is the structured config. The Markdown body below it is
+shared workflow policy that Daedalus prepends to its role-specific prompts.
+
+## Bring it up
+
+```bash
+hermes daedalus service-up
+```
+
+`service-up` runs the supported post-edit path in one command:
+
+- initialize runtime state
+- validate `WORKFLOW.md` and workflow preflight rules
+- install the user systemd unit
+- enable the unit
+- start the service
+
+Use `--service-mode shadow` if you want read-only parity validation first.
+
+## Manual low-level path
+
+If you want to inspect or script each step separately, the lower-level commands
+remain available:
 
 ```bash
 hermes daedalus init \
@@ -76,11 +120,7 @@ hermes daedalus init \
 hermes daedalus doctor \
   --workflow-root ~/.hermes/workflows/your-org-your-repo-code-review \
   --format json
-```
 
-## Supervise it
-
-```bash
 hermes daedalus service-install \
   --workflow-root ~/.hermes/workflows/your-org-your-repo-code-review \
   --service-mode active
@@ -94,12 +134,9 @@ hermes daedalus service-start \
   --service-mode active
 ```
 
-Use `--service-mode shadow` if you want read-only parity validation first.
-
 ## Operate it from Hermes
 
 ```bash
-export DAEDALUS_WORKFLOW_ROOT=~/.hermes/workflows/your-org-your-repo-code-review
 cd /path/to/your/repo
 hermes
 ```
@@ -149,4 +186,4 @@ hermes plugins enable daedalus
 
 ## Legacy migration
 
-`scripts/migrate_config.py` is only for migrating older JSON configs into the new `workflow.yaml` shape. It is not the primary onboarding path for new installs.
+`scripts/migrate_config.py` is only for migrating older JSON configs into the new `WORKFLOW.md` shape. It is not the primary onboarding path for new installs.

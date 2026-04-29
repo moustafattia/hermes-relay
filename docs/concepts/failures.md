@@ -92,7 +92,7 @@ Two hardening fixes during lane 220 work changed how failures interact with the 
 
 ## Retry policy
 
-Retries are governed by `workflow.yaml`:
+Retries are governed by `WORKFLOW.md`:
 
 ```yaml
 retry:

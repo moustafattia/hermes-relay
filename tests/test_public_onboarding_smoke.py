@@ -15,10 +15,11 @@ def _load_module(module_name: str, path: Path):
     return module
 
 
-def test_public_onboarding_path_install_scaffold_init_and_supervise(tmp_path, monkeypatch):
+def test_public_onboarding_path_install_bootstrap_and_service_up(tmp_path, monkeypatch):
     install = _load_module("daedalus_install_smoke", REPO_ROOT / "scripts" / "install.py")
     hermes_home = tmp_path / ".hermes"
     plugin_dir = install.install_plugin(repo_root=REPO_ROOT, hermes_home=hermes_home)
+    monkeypatch.setenv("HOME", str(tmp_path))
 
     monkeypatch.syspath_prepend(str(plugin_dir))
     tools = _load_module("daedalus_tools_smoke", plugin_dir / "tools.py")
@@ -26,49 +27,50 @@ def test_public_onboarding_path_install_scaffold_init_and_supervise(tmp_path, mo
     systemd_user_dir = tmp_path / "systemd-user"
     monkeypatch.setenv("DAEDALUS_SYSTEMD_USER_DIR", str(systemd_user_dir))
 
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True, text=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", "git@github.com:attmous/daedalus.git"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    monkeypatch.chdir(repo)
+
     captured_commands = []
+    real_run = subprocess.run
 
     def fake_run(cmd, **kwargs):
         captured_commands.append(cmd)
-        return subprocess.CompletedProcess(cmd, 0, "", "")
+        if cmd[:2] == ["systemctl", "--user"]:
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+        return real_run(cmd, **kwargs)
 
     monkeypatch.setattr(subprocess, "run", fake_run)
     monkeypatch.setattr(tools.subprocess, "run", fake_run)
 
     workflow_root = hermes_home / "workflows" / "attmous-daedalus-code-review"
 
-    scaffold_out = tools.execute_raw_args(
-        f"scaffold-workflow --workflow-root {workflow_root} --github-slug attmous/daedalus"
-    )
-    assert "scaffolded workflow root" in scaffold_out
+    bootstrap_out = tools.execute_raw_args("bootstrap")
+    assert "bootstrapped workflow root" in bootstrap_out
+    assert (repo / ".hermes" / "daedalus" / "workflow-root").read_text(encoding="utf-8").strip() == str(workflow_root)
 
-    init_out = tools.execute_raw_args(f"init --workflow-root {workflow_root} --json")
-    init_payload = json.loads(init_out)
-    assert init_payload["ok"] is True
+    service_up_out = tools.execute_raw_args("service-up --json")
+    service_up_payload = json.loads(service_up_out)
+    assert service_up_payload["ok"] is True
+    assert service_up_payload["preflight"]["ok"] is True
+    assert service_up_payload["preflight"]["workflow"] == "code-review"
+    assert Path(service_up_payload["service_install"]["unit_path"]).exists()
+    assert service_up_payload["service_enable"]["ok"] is True
+    assert service_up_payload["service_start"]["ok"] is True
+    assert service_up_payload["service_status"]["service_name"] == "daedalus-active@attmous-daedalus-code-review.service"
 
-    status_out = tools.execute_raw_args(f"status --workflow-root {workflow_root} --format json")
+    status_out = tools.execute_raw_args("status --format json")
     status_payload = json.loads(status_out)
     assert status_payload["runtime_status"] == "initialized"
     assert status_payload["project_key"] == "attmous-daedalus-code-review"
-
-    install_out = tools.execute_raw_args(
-        f"service-install --workflow-root {workflow_root} --service-mode active --json"
-    )
-    install_payload = json.loads(install_out)
-    assert install_payload["installed"] is True
-    assert Path(install_payload["unit_path"]).exists()
-
-    enable_out = tools.execute_raw_args(
-        f"service-enable --workflow-root {workflow_root} --service-mode active --json"
-    )
-    enable_payload = json.loads(enable_out)
-    assert enable_payload["ok"] is True
-
-    start_out = tools.execute_raw_args(
-        f"service-start --workflow-root {workflow_root} --service-mode active --json"
-    )
-    start_payload = json.loads(start_out)
-    assert start_payload["ok"] is True
 
     assert ["systemctl", "--user", "daemon-reload"] in captured_commands
     assert ["systemctl", "--user", "enable", "daedalus-active@attmous-daedalus-code-review.service"] in captured_commands
@@ -79,9 +81,10 @@ def test_readme_quickstart_mentions_supported_public_path():
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
 
     assert "hermes plugins install attmous/daedalus --enable" in readme
+    assert "hermes daedalus bootstrap" in readme
     assert "hermes daedalus scaffold-workflow" in readme
-    assert "scaffold-workflow" in readme
-    assert "service-install" in readme
+    assert "WORKFLOW.md" in readme
+    assert "service-up" in readme
     assert "docs/operator/installation.md" in readme
     assert "docs/public-contract.md" in readme
     assert "python3 -m pip install ." in readme

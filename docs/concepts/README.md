@@ -51,7 +51,7 @@ The beating heart of Daedalus. These five concepts explain how the engine keeps 
 | [**Lanes**](./lanes.md) | The unit of work. One GitHub issue becomes one lane, carried from discovery to merge. | ...you want to see the full lifecycle of an automated issue. |
 | [**Actions**](./actions.md) | The atomic unit of work. Queued, idempotent, tracked with composite keys. | ...you want to know how Daedalus guarantees exactly-once execution. |
 | [**Shadow → Active**](./shadow-active.md) | Two execution modes: observe safely, then promote to real side effects. | ...you want to validate Daedalus parity before letting it touch real PRs. |
-| [**Hot-reload**](./hot-reload.md) | Edit `workflow.yaml`, save, next tick picks it up. Bad edits are ignored, not fatal. | ...you want to change policy without restarting the service. |
+| [**Hot-reload**](./hot-reload.md) | Edit `WORKFLOW.md`, save, next tick picks it up. Bad edits are ignored, not fatal. | ...you want to change policy without restarting the service. |
 
 **The narrative arc:** *Leases* give you ownership → *Lanes* give you work → *Actions* give you execution → *Shadow/Active* gives you safety → *Hot-reload* gives you agility.
 

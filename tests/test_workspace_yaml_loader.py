@@ -84,13 +84,8 @@ def _yaml_config(repo_path: Path) -> dict:
 
 
 def _workflow_markdown(config: dict, *, prompt_role: str = "coder", body: str = "Contract prompt") -> str:
-    front_matter = {
-        "daedalus": {
-            "prompt-role": prompt_role,
-            "workflow-config": config,
-        },
-    }
-    return "---\n" + yaml.safe_dump(front_matter, sort_keys=False) + "---\n\n" + body + "\n"
+    del prompt_role
+    return "---\n" + yaml.safe_dump(config, sort_keys=False) + "---\n\n" + body + "\n"
 
 
 def test_load_workspace_from_config_prefers_workflow_yaml(tmp_path):
@@ -140,6 +135,7 @@ def test_load_workspace_from_config_accepts_explicit_markdown_path(tmp_path):
 
     assert ws.REPO_PATH == Path(tmp_path / "markdown-repo")
     assert ws.ENGINE_OWNER == "hermes"
+    assert ws.WORKFLOW_POLICY == "Contract prompt"
 
 
 def test_load_workspace_from_config_rejects_json_config_path(tmp_path):
@@ -164,6 +160,7 @@ def test_load_workspace_from_config_falls_back_to_workflow_markdown(tmp_path):
 
     assert ws.REPO_PATH == Path(tmp_path / "markdown-repo")
     assert ws.ENGINE_OWNER == "hermes"
+    assert ws.WORKFLOW_POLICY == "Contract prompt"
 
 
 def test_load_workspace_from_config_raises_when_no_config_present(tmp_path):

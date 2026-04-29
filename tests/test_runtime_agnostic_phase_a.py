@@ -286,6 +286,33 @@ def test_dispatch_agent_prefers_inline_prompt_template_from_config(tmp_path):
     assert Path(prompt_files[0]).read_text() == "Inline contract prompt"
 
 
+def test_dispatch_agent_prepends_shared_workflow_policy(tmp_path):
+    from workflows.code_review.dispatch import dispatch_agent
+
+    fake_run = MagicMock(return_value=MagicMock(stdout="ok"))
+    agents = {
+        "coder": {
+            "default": {"name": "c", "model": "gpt-5", "runtime": "codex-acpx"},
+        },
+    }
+    ws = _make_workspace(tmp_path, agents, _runtimes_cfg(), fake_run)
+    ws.config["prompts"] = {"coder": "Role-specific instructions"}
+    ws.config["workflow-policy"] = "Never widen scope."
+
+    dispatch_agent(
+        workspace=ws, role="coder", tier="default",
+        prompt_kwargs={}, session_name="lane-10", worktree=tmp_path,
+    )
+
+    argv = fake_run.call_args[0][0]
+    prompt_files = [a for a in argv if a.endswith(".txt")]
+    assert len(prompt_files) == 1
+    text = Path(prompt_files[0]).read_text()
+    assert "# Shared Workflow Policy" in text
+    assert "Never widen scope." in text
+    assert "Role-specific instructions" in text
+
+
 def test_dispatch_agent_legacy_fallback_calls_run_prompt(tmp_path):
     """When neither agent nor runtime has command:, dispatcher calls runtime.run_prompt."""
     from workflows.code_review.dispatch import dispatch_agent

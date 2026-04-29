@@ -75,17 +75,7 @@ def _write_workflow_markdown(workflow_root: Path, *, instance_name: str = "bluep
     }
     workflow_root.mkdir(parents=True, exist_ok=True)
     (workflow_root / "WORKFLOW.md").write_text(
-        "---\n"
-        + yaml.safe_dump(
-            {
-                "daedalus": {
-                    "prompt-role": "coder",
-                    "workflow-config": config,
-                },
-            },
-            sort_keys=False,
-        )
-        + "---\n\nPrompt body\n",
+        "---\n" + yaml.safe_dump(config, sort_keys=False) + "---\n\nPrompt body\n",
         encoding="utf-8",
     )
 
@@ -162,6 +152,30 @@ def test_resolve_default_workflow_root_detects_cwd_ancestor_with_workflow_markdo
     (workflow_root / "memory").mkdir(parents=True, exist_ok=True)
     (workflow_root / "state").mkdir(parents=True, exist_ok=True)
     nested.mkdir(parents=True)
+
+    resolved = paths_module.resolve_default_workflow_root(
+        plugin_dir=tmp_path / "plugin" / "daedalus",
+        env={},
+        cwd=nested,
+    )
+
+    assert resolved == workflow_root.resolve()
+
+
+def test_resolve_default_workflow_root_follows_repo_local_pointer(tmp_path):
+    paths_module = load_module("daedalus_workflows_code_review_paths_test", "workflows/code_review/paths.py")
+    workflow_root = tmp_path / ".hermes" / "workflows" / "owner-repo-code-review"
+    _write_workflow_markdown(workflow_root)
+    (workflow_root / "runtime").mkdir(parents=True, exist_ok=True)
+    (workflow_root / "memory").mkdir(parents=True, exist_ok=True)
+    (workflow_root / "state").mkdir(parents=True, exist_ok=True)
+
+    repo_root = tmp_path / "repo"
+    nested = repo_root / "src" / "pkg"
+    nested.mkdir(parents=True)
+    pointer_path = repo_root / ".hermes" / "daedalus" / "workflow-root"
+    pointer_path.parent.mkdir(parents=True)
+    pointer_path.write_text(str(workflow_root.resolve()) + "\n", encoding="utf-8")
 
     resolved = paths_module.resolve_default_workflow_root(
         plugin_dir=tmp_path / "plugin" / "daedalus",

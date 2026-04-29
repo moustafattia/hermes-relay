@@ -13,7 +13,7 @@ Schema::
         }
     }
 
-Override is per-workflow and overrides the workflow.yaml value at
+Override is per-workflow and overrides the workflow-contract value at
 resolution time. Used by ``/daedalus set-observability``.
 """
 from __future__ import annotations

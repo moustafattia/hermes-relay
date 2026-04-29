@@ -11,11 +11,21 @@ from contextlib import redirect_stderr
 from pathlib import Path
 from typing import Any
 
-from workflows.contract import WorkflowContractError, load_workflow_contract
+import yaml
+
+from workflows.contract import (
+    WorkflowContractError,
+    load_workflow_contract,
+    load_workflow_contract_file,
+    render_workflow_markdown,
+    workflow_yaml_path as legacy_workflow_config_path,
+    workflow_markdown_path,
+)
 from workflows.code_review.paths import (
     derive_workflow_instance_name,
     plugin_runtime_path,
     project_key_for_workflow_root,
+    repo_local_workflow_pointer_path,
     resolve_default_workflow_root as resolve_workflow_root_default,
     workflow_cli_argv,
 )
@@ -313,6 +323,126 @@ def install_supervised_service(
         "instance_id": resolved_instance_id,
         "unit_path": str(template_path),
         "daemon_reload": reload_result,
+    }
+
+
+def _validate_workflow_contract_preflight(workflow_root: Path) -> dict[str, Any]:
+    import jsonschema
+    from workflows import load_workflow
+
+    contract = load_workflow_contract(workflow_root)
+    config = contract.config
+    workflow_name = config.get("workflow")
+    if not workflow_name:
+        raise DaedalusCommandError(
+            f"{contract.source_path} is missing top-level `workflow:` field"
+        )
+    module = load_workflow(str(workflow_name))
+    schema = yaml.safe_load(module.CONFIG_SCHEMA_PATH.read_text(encoding="utf-8"))
+    jsonschema.validate(config, schema)
+    schema_version = int(config.get("schema-version", 1))
+    if schema_version not in module.SUPPORTED_SCHEMA_VERSIONS:
+        raise DaedalusCommandError(
+            f"workflow {workflow_name!r} does not support schema-version={schema_version}; "
+            f"supported: {list(module.SUPPORTED_SCHEMA_VERSIONS)}"
+        )
+    preflight_fn = getattr(module, "run_preflight", None)
+    if callable(preflight_fn):
+        result = preflight_fn(config)
+        if not getattr(result, "ok", True):
+            raise DaedalusCommandError(
+                f"workflow preflight failed for {workflow_name!r}: "
+                f"code={getattr(result, 'error_code', None)} "
+                f"detail={getattr(result, 'error_detail', None)}"
+            )
+        return {
+            "ok": True,
+            "workflow": workflow_name,
+            "schema_version": schema_version,
+            "preflight": {
+                "ok": True,
+                "error_code": getattr(result, "error_code", None),
+                "error_detail": getattr(result, "error_detail", None),
+            },
+            "source_path": str(contract.source_path),
+        }
+    return {
+        "ok": True,
+        "workflow": workflow_name,
+        "schema_version": schema_version,
+        "preflight": {"ok": True, "error_code": None, "error_detail": None},
+        "source_path": str(contract.source_path),
+    }
+
+
+def service_up(
+    *,
+    workflow_root: Path,
+    project_key: str,
+    instance_id: str | None,
+    interval_seconds: int,
+    service_name: str | None = None,
+    service_mode: str = "active",
+) -> dict[str, Any]:
+    daedalus = _load_daedalus_module(workflow_root)
+    init_result = daedalus.init_daedalus_db(workflow_root=workflow_root, project_key=project_key)
+    preflight_result = _validate_workflow_contract_preflight(workflow_root)
+
+    install_result = install_supervised_service(
+        workflow_root=workflow_root,
+        project_key=project_key,
+        instance_id=instance_id,
+        interval_seconds=interval_seconds,
+        service_name=service_name,
+        service_mode=service_mode,
+    )
+    if not install_result.get("installed"):
+        daemon_reload = install_result.get("daemon_reload") or {}
+        raise DaedalusCommandError(
+            "unable to install systemd service: "
+            f"{daemon_reload.get('stderr') or daemon_reload.get('stdout') or 'daemon-reload failed'}"
+        )
+
+    enable_result = service_control(
+        "enable",
+        workflow_root=workflow_root,
+        service_name=service_name,
+        service_mode=service_mode,
+    )
+    if not enable_result.get("ok"):
+        raise DaedalusCommandError(
+            "unable to enable systemd service: "
+            f"{enable_result.get('stderr') or enable_result.get('stdout') or enable_result.get('returncode')}"
+        )
+
+    start_result = service_control(
+        "start",
+        workflow_root=workflow_root,
+        service_name=service_name,
+        service_mode=service_mode,
+    )
+    if not start_result.get("ok"):
+        raise DaedalusCommandError(
+            "unable to start systemd service: "
+            f"{start_result.get('stderr') or start_result.get('stdout') or start_result.get('returncode')}"
+        )
+
+    service_status_result = service_status(
+        workflow_root=workflow_root,
+        service_name=service_name,
+        service_mode=service_mode,
+    )
+    return {
+        "ok": True,
+        "workflow_root": str(workflow_root),
+        "project_key": project_key,
+        "service_mode": service_mode,
+        "init": init_result,
+        "preflight": preflight_result,
+        "service_install": install_result,
+        "service_enable": enable_result,
+        "service_start": start_result,
+        "service_status": service_status_result,
     }
 
 
@@ -1009,12 +1139,117 @@ def _lazy_cmd_watch(args, parser):
 
 def _workflow_template_path(workflow_name: str) -> Path:
     templates = {
-        "code-review": PLUGIN_DIR / "workflows" / "code_review" / "workflow.template.yaml",
+        "code-review": PLUGIN_DIR / "workflows" / "code_review" / "workflow.template.md",
     }
     path = templates.get(workflow_name)
     if path is None:
         raise DaedalusCommandError(f"no bundled workflow template for {workflow_name!r}")
     return path
+
+
+_GITHUB_REMOTE_RE = re.compile(
+    r"^(?:git@github\.com:|ssh://git@github\.com/|https?://(?:www\.)?github\.com/)"
+    r"(?P<owner>[^/]+)/(?P<repo>[^/]+?)(?:\.git)?/?$"
+)
+
+
+def _git_stdout(*args: str, cwd: Path) -> str:
+    completed = subprocess.run(
+        ["git", *args],
+        cwd=str(cwd),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        detail = completed.stderr.strip() or completed.stdout.strip() or "git command failed"
+        raise DaedalusCommandError(f"`git {' '.join(args)}` failed in {cwd}: {detail}")
+    return completed.stdout.strip()
+
+
+def _discover_git_repo_root(start_path: Path | None) -> Path:
+    start = (start_path or Path.cwd()).expanduser().resolve()
+    if not start.exists():
+        raise DaedalusCommandError(f"repo path does not exist: {start}")
+    cwd = start.parent if start.is_file() else start
+    try:
+        repo_root = _git_stdout("rev-parse", "--show-toplevel", cwd=cwd)
+    except DaedalusCommandError as exc:
+        raise DaedalusCommandError(
+            "bootstrap must run inside a git repository or use --repo-path pointing at one"
+        ) from exc
+    return Path(repo_root).expanduser().resolve()
+
+
+def _github_slug_from_remote_url(remote_url: str) -> str:
+    match = _GITHUB_REMOTE_RE.match(remote_url.strip())
+    if not match:
+        raise DaedalusCommandError(
+            "unable to derive --github-slug from git origin; use a GitHub remote or pass --github-slug explicitly"
+        )
+    owner = match.group("owner").strip()
+    repo = match.group("repo").strip()
+    if not owner or not repo:
+        raise DaedalusCommandError(
+            "unable to derive --github-slug from git origin; use a GitHub remote or pass --github-slug explicitly"
+        )
+    return f"{owner}/{repo}"
+
+
+def bootstrap_workflow_root(
+    *,
+    repo_path: Path | None,
+    workflow_name: str,
+    workflow_root: Path | None,
+    github_slug: str | None,
+    active_lane_label: str,
+    engine_owner: str,
+    force: bool,
+) -> dict[str, Any]:
+    repo_root = _discover_git_repo_root(repo_path)
+    remote_url = None
+    resolved_github_slug = (github_slug or "").strip()
+    if not resolved_github_slug:
+        remote_url = _git_stdout("remote", "get-url", "origin", cwd=repo_root)
+        resolved_github_slug = _github_slug_from_remote_url(remote_url)
+
+    try:
+        instance_name = derive_workflow_instance_name(
+            github_slug=resolved_github_slug,
+            workflow_name=workflow_name,
+        )
+    except ValueError as exc:
+        raise DaedalusCommandError(f"--github-slug {resolved_github_slug!r} is invalid: {exc}") from exc
+
+    resolved_workflow_root = (
+        workflow_root.expanduser().resolve()
+        if workflow_root is not None
+        else (Path.home() / ".hermes" / "workflows" / instance_name).resolve()
+    )
+
+    result = scaffold_workflow_root(
+        workflow_root=resolved_workflow_root,
+        workflow_name=workflow_name,
+        repo_path=repo_root,
+        github_slug=resolved_github_slug,
+        active_lane_label=active_lane_label,
+        engine_owner=engine_owner,
+        force=force,
+    )
+    pointer_path = repo_local_workflow_pointer_path(repo_root)
+    pointer_path.parent.mkdir(parents=True, exist_ok=True)
+    pointer_path.write_text(str(resolved_workflow_root) + "\n", encoding="utf-8")
+    result.update(
+        {
+            "bootstrap": True,
+            "detected_repo_root": str(repo_root),
+            "remote_url": remote_url,
+            "repo_pointer_path": str(pointer_path),
+            "next_edit_path": result["contract_path"],
+            "next_command": "hermes daedalus service-up",
+        }
+    )
+    return result
 
 
 def scaffold_workflow_root(
@@ -1027,19 +1262,23 @@ def scaffold_workflow_root(
     engine_owner: str,
     force: bool,
 ) -> dict[str, Any]:
-    import yaml  # type: ignore[import]
-
     root = workflow_root.expanduser().resolve()
-    config_path = root / "config" / "workflow.yaml"
-    if config_path.exists() and not force:
+    contract_path = workflow_markdown_path(root)
+    legacy_config_path = legacy_workflow_config_path(root)
+    existing_contract_path = contract_path if contract_path.exists() else legacy_config_path
+    if existing_contract_path.exists() and not force:
         raise DaedalusCommandError(
-            f"refusing to overwrite existing config: {config_path} (pass --force to replace it)"
+            f"refusing to overwrite existing workflow contract: {existing_contract_path} "
+            "(pass --force to replace it)"
         )
 
     template_path = _workflow_template_path(workflow_name)
-    config = yaml.safe_load(template_path.read_text(encoding="utf-8"))
-    if not isinstance(config, dict):
-        raise DaedalusCommandError(f"workflow template must be a YAML mapping: {template_path}")
+    try:
+        template_contract = load_workflow_contract_file(template_path)
+    except (WorkflowContractError, OSError, UnicodeDecodeError) as exc:
+        raise DaedalusCommandError(f"unable to load workflow template {template_path}: {exc}") from exc
+    config = dict(template_contract.config)
+    workflow_policy = template_contract.prompt_template
 
     resolved_github_slug = github_slug.strip()
     if not resolved_github_slug:
@@ -1086,18 +1325,22 @@ def scaffold_workflow_root(
         root / "runtime" / "state" / "daedalus",
         root / "workspace",
         resolved_repo_path,
+        root / "config",
     ]
     for path in created_dirs:
         path.mkdir(parents=True, exist_ok=True)
 
-    config_path.write_text(
-        yaml.safe_dump(config, sort_keys=False),
+    contract_path.write_text(
+        render_workflow_markdown(config=config, prompt_template=workflow_policy),
         encoding="utf-8",
     )
+    if force and legacy_config_path.exists():
+        legacy_config_path.unlink()
     return {
         "ok": True,
         "workflow_root": str(root),
-        "config_path": str(config_path),
+        "contract_path": str(contract_path),
+        "config_path": str(contract_path),
         "workflow": workflow_name,
         "instance_name": resolved_instance_name,
         "engine_owner": engine_owner,
@@ -1122,12 +1365,38 @@ def cmd_scaffold_workflow(args, parser) -> str:
         return json.dumps(result, indent=2, sort_keys=True)
     lines = [
         f"scaffolded workflow root: {result['workflow_root']}",
-        f"config: {result['config_path']}",
+        f"contract: {result['contract_path']}",
         f"workflow: {result['workflow']}",
         f"instance: {result['instance_name']}",
         f"repo-path: {result['repo_path']}",
         f"github-slug: {result['github_slug']}",
     ]
+    return "\n".join(lines)
+
+
+def cmd_bootstrap_workflow(args, parser) -> str:
+    result = bootstrap_workflow_root(
+        repo_path=Path(args.repo_path) if args.repo_path else None,
+        workflow_name=args.workflow,
+        workflow_root=Path(args.workflow_root) if args.workflow_root else None,
+        github_slug=args.github_slug,
+        active_lane_label=args.active_lane_label,
+        engine_owner=args.engine_owner,
+        force=args.force,
+    )
+    if getattr(args, "json", False):
+        return json.dumps(result, indent=2, sort_keys=True)
+    lines = [
+        f"bootstrapped workflow root: {result['workflow_root']}",
+        f"contract: {result['contract_path']}",
+        f"repo-path: {result['repo_path']}",
+        f"github-slug: {result['github_slug']}",
+        f"repo pointer: {result['repo_pointer_path']}",
+        f"edit next: {result['next_edit_path']}",
+        f"then run: {result['next_command']}",
+    ]
+    if result.get("remote_url"):
+        lines.insert(4, f"origin: {result['remote_url']}")
     return "\n".join(lines)
 
 
@@ -1297,15 +1566,17 @@ def cmd_get_observability(args, parser) -> str:
 def configure_subcommands(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="daedalus_command")
     sub.required = True
+    default_workflow_root_str = str(resolve_default_workflow_root())
+    default_workflow_root_path = resolve_default_workflow_root()
 
     init_cmd = sub.add_parser("init", help="Initialize Daedalus DB and filesystem paths.")
-    init_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
+    init_cmd.add_argument("--workflow-root", default=default_workflow_root_str)
     init_cmd.add_argument("--project-key")
     init_cmd.add_argument("--json", action="store_true")
     init_cmd.set_defaults(func=run_cli_command)
 
     start_cmd = sub.add_parser("start", help="Bootstrap Daedalus runtime and acquire runtime lease.")
-    start_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
+    start_cmd.add_argument("--workflow-root", default=default_workflow_root_str)
     start_cmd.add_argument("--project-key")
     start_cmd.add_argument("--instance-id", default=DEFAULT_INSTANCE_ID)
     start_cmd.add_argument("--mode", default="shadow", choices=["shadow", "active", "maintenance"])
@@ -1313,7 +1584,7 @@ def configure_subcommands(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     start_cmd.set_defaults(func=run_cli_command)
 
     status_cmd = sub.add_parser("status", help="Show Daedalus runtime status.")
-    status_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
+    status_cmd.add_argument("--workflow-root", default=default_workflow_root_str)
     status_cmd.add_argument("--json", action="store_true")
     status_cmd.add_argument(
         "--format",
@@ -1324,7 +1595,7 @@ def configure_subcommands(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     status_cmd.set_defaults(func=run_cli_command)
 
     report_cmd = sub.add_parser("shadow-report", help="Summarize the live legacy lane, Daedalus shadow decision, compatibility, and recent shadow actions.")
-    report_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
+    report_cmd.add_argument("--workflow-root", default=default_workflow_root_str)
     report_cmd.add_argument("--recent-actions-limit", type=int, default=5)
     report_cmd.add_argument("--json", action="store_true")
     report_cmd.add_argument(
@@ -1336,7 +1607,7 @@ def configure_subcommands(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     report_cmd.set_defaults(func=run_cli_command)
 
     doctor_cmd = sub.add_parser("doctor", help="Diagnose Daedalus runtime freshness, lease ownership, shadow parity, and active-lane consistency.")
-    doctor_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
+    doctor_cmd.add_argument("--workflow-root", default=default_workflow_root_str)
     doctor_cmd.add_argument("--recent-actions-limit", type=int, default=5)
     doctor_cmd.add_argument("--json", action="store_true")
     doctor_cmd.add_argument(
@@ -1348,7 +1619,7 @@ def configure_subcommands(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     doctor_cmd.set_defaults(func=run_cli_command)
 
     service_install_cmd = sub.add_parser("service-install", help="Install the supervised Daedalus systemd user service.")
-    service_install_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
+    service_install_cmd.add_argument("--workflow-root", default=default_workflow_root_str)
     service_install_cmd.add_argument("--project-key")
     service_install_cmd.add_argument("--instance-id")
     service_install_cmd.add_argument("--interval-seconds", type=int, default=30)
@@ -1357,50 +1628,63 @@ def configure_subcommands(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     service_install_cmd.add_argument("--json", action="store_true")
     service_install_cmd.set_defaults(func=run_cli_command)
 
+    service_up_cmd = sub.add_parser(
+        "service-up",
+        help="Initialize, preflight, install, enable, and start the supervised Daedalus systemd user service.",
+    )
+    service_up_cmd.add_argument("--workflow-root", default=default_workflow_root_str)
+    service_up_cmd.add_argument("--project-key")
+    service_up_cmd.add_argument("--instance-id")
+    service_up_cmd.add_argument("--interval-seconds", type=int, default=30)
+    service_up_cmd.add_argument("--service-mode", choices=sorted(SERVICE_PROFILES), default="active")
+    service_up_cmd.add_argument("--service-name")
+    service_up_cmd.add_argument("--json", action="store_true")
+    service_up_cmd.set_defaults(func=run_cli_command)
+
     service_uninstall_cmd = sub.add_parser("service-uninstall", help="Remove the supervised Daedalus systemd user service.")
-    service_uninstall_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
+    service_uninstall_cmd.add_argument("--workflow-root", default=default_workflow_root_str)
     service_uninstall_cmd.add_argument("--service-mode", choices=sorted(SERVICE_PROFILES), default="shadow")
     service_uninstall_cmd.add_argument("--service-name")
     service_uninstall_cmd.add_argument("--json", action="store_true")
     service_uninstall_cmd.set_defaults(func=run_cli_command)
 
     service_start_cmd = sub.add_parser("service-start", help="Start the supervised Daedalus systemd user service.")
-    service_start_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
+    service_start_cmd.add_argument("--workflow-root", default=default_workflow_root_str)
     service_start_cmd.add_argument("--service-mode", choices=sorted(SERVICE_PROFILES), default="shadow")
     service_start_cmd.add_argument("--service-name")
     service_start_cmd.add_argument("--json", action="store_true")
     service_start_cmd.set_defaults(func=run_cli_command)
 
     service_stop_cmd = sub.add_parser("service-stop", help="Stop the supervised Daedalus systemd user service.")
-    service_stop_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
+    service_stop_cmd.add_argument("--workflow-root", default=default_workflow_root_str)
     service_stop_cmd.add_argument("--service-mode", choices=sorted(SERVICE_PROFILES), default="shadow")
     service_stop_cmd.add_argument("--service-name")
     service_stop_cmd.add_argument("--json", action="store_true")
     service_stop_cmd.set_defaults(func=run_cli_command)
 
     service_restart_cmd = sub.add_parser("service-restart", help="Restart the supervised Daedalus systemd user service.")
-    service_restart_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
+    service_restart_cmd.add_argument("--workflow-root", default=default_workflow_root_str)
     service_restart_cmd.add_argument("--service-mode", choices=sorted(SERVICE_PROFILES), default="shadow")
     service_restart_cmd.add_argument("--service-name")
     service_restart_cmd.add_argument("--json", action="store_true")
     service_restart_cmd.set_defaults(func=run_cli_command)
 
     service_enable_cmd = sub.add_parser("service-enable", help="Enable the supervised Daedalus systemd user service.")
-    service_enable_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
+    service_enable_cmd.add_argument("--workflow-root", default=default_workflow_root_str)
     service_enable_cmd.add_argument("--service-mode", choices=sorted(SERVICE_PROFILES), default="shadow")
     service_enable_cmd.add_argument("--service-name")
     service_enable_cmd.add_argument("--json", action="store_true")
     service_enable_cmd.set_defaults(func=run_cli_command)
 
     service_disable_cmd = sub.add_parser("service-disable", help="Disable the supervised Daedalus systemd user service.")
-    service_disable_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
+    service_disable_cmd.add_argument("--workflow-root", default=default_workflow_root_str)
     service_disable_cmd.add_argument("--service-mode", choices=sorted(SERVICE_PROFILES), default="shadow")
     service_disable_cmd.add_argument("--service-name")
     service_disable_cmd.add_argument("--json", action="store_true")
     service_disable_cmd.set_defaults(func=run_cli_command)
 
     service_status_cmd = sub.add_parser("service-status", help="Show supervised Daedalus systemd user service status.")
-    service_status_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
+    service_status_cmd.add_argument("--workflow-root", default=default_workflow_root_str)
     service_status_cmd.add_argument("--service-mode", choices=sorted(SERVICE_PROFILES), default="shadow")
     service_status_cmd.add_argument("--service-name")
     service_status_cmd.add_argument("--json", action="store_true")
@@ -1413,7 +1697,7 @@ def configure_subcommands(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     service_status_cmd.set_defaults(func=run_cli_command)
 
     service_logs_cmd = sub.add_parser("service-logs", help="Show recent logs for the supervised Daedalus systemd user service.")
-    service_logs_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
+    service_logs_cmd.add_argument("--workflow-root", default=default_workflow_root_str)
     service_logs_cmd.add_argument("--service-mode", choices=sorted(SERVICE_PROFILES), default="shadow")
     service_logs_cmd.add_argument("--service-name")
     service_logs_cmd.add_argument("--lines", type=int, default=50)
@@ -1421,25 +1705,25 @@ def configure_subcommands(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     service_logs_cmd.set_defaults(func=run_cli_command)
 
     ingest_cmd = sub.add_parser("ingest-live", help="Ingest current workflow status into Daedalus shadow state.")
-    ingest_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
+    ingest_cmd.add_argument("--workflow-root", default=default_workflow_root_str)
     ingest_cmd.add_argument("--json", action="store_true")
     ingest_cmd.set_defaults(func=run_cli_command)
 
     heartbeat_cmd = sub.add_parser("heartbeat", help="Refresh Daedalus runtime lease and heartbeat timestamp.")
-    heartbeat_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
+    heartbeat_cmd.add_argument("--workflow-root", default=default_workflow_root_str)
     heartbeat_cmd.add_argument("--instance-id", default=DEFAULT_INSTANCE_ID)
     heartbeat_cmd.add_argument("--ttl-seconds", type=int, default=60)
     heartbeat_cmd.add_argument("--json", action="store_true")
     heartbeat_cmd.set_defaults(func=run_cli_command)
 
     iterate_cmd = sub.add_parser("iterate-shadow", help="Run one shadow-mode loop iteration.")
-    iterate_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
+    iterate_cmd.add_argument("--workflow-root", default=default_workflow_root_str)
     iterate_cmd.add_argument("--instance-id", default=DEFAULT_INSTANCE_ID)
     iterate_cmd.add_argument("--json", action="store_true")
     iterate_cmd.set_defaults(func=run_cli_command)
 
     run_cmd = sub.add_parser("run-shadow", help="Run the shadow-mode loop shell for one or more iterations.")
-    run_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
+    run_cmd.add_argument("--workflow-root", default=default_workflow_root_str)
     run_cmd.add_argument("--project-key")
     run_cmd.add_argument("--instance-id", default=DEFAULT_INSTANCE_ID)
     run_cmd.add_argument("--interval-seconds", type=int, default=30)
@@ -1448,7 +1732,7 @@ def configure_subcommands(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     run_cmd.set_defaults(func=run_cli_command)
 
     active_gate_status_cmd = sub.add_parser("active-gate-status", help="Show Daedalus active-execution gate state.")
-    active_gate_status_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
+    active_gate_status_cmd.add_argument("--workflow-root", default=default_workflow_root_str)
     active_gate_status_cmd.add_argument("--json", action="store_true")
     active_gate_status_cmd.add_argument(
         "--format",
@@ -1459,19 +1743,19 @@ def configure_subcommands(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     active_gate_status_cmd.set_defaults(func=run_cli_command)
 
     set_active_execution_cmd = sub.add_parser("set-active-execution", help="Enable or disable Daedalus active execution.")
-    set_active_execution_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
+    set_active_execution_cmd.add_argument("--workflow-root", default=default_workflow_root_str)
     set_active_execution_cmd.add_argument("--enabled", required=True, choices=["true", "false"])
     set_active_execution_cmd.add_argument("--json", action="store_true")
     set_active_execution_cmd.set_defaults(func=run_cli_command)
 
     iterate_active_cmd = sub.add_parser("iterate-active", help="Run one guarded active-mode loop iteration.")
-    iterate_active_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
+    iterate_active_cmd.add_argument("--workflow-root", default=default_workflow_root_str)
     iterate_active_cmd.add_argument("--instance-id", default=DEFAULT_INSTANCE_ID)
     iterate_active_cmd.add_argument("--json", action="store_true")
     iterate_active_cmd.set_defaults(func=run_cli_command)
 
     run_active_cmd = sub.add_parser("run-active", help="Run the guarded active-mode loop shell for one or more iterations.")
-    run_active_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
+    run_active_cmd.add_argument("--workflow-root", default=default_workflow_root_str)
     run_active_cmd.add_argument("--project-key")
     run_active_cmd.add_argument("--instance-id", default=DEFAULT_INSTANCE_ID)
     run_active_cmd.add_argument("--interval-seconds", type=int, default=30)
@@ -1480,19 +1764,19 @@ def configure_subcommands(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     run_active_cmd.set_defaults(func=run_cli_command)
 
     request_active_cmd = sub.add_parser("request-active-actions", help="Derive and persist active requested actions for one lane.")
-    request_active_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
+    request_active_cmd.add_argument("--workflow-root", default=default_workflow_root_str)
     request_active_cmd.add_argument("--lane-id", required=True)
     request_active_cmd.add_argument("--json", action="store_true")
     request_active_cmd.set_defaults(func=run_cli_command)
 
     execute_action_cmd = sub.add_parser("execute-action", help="Execute one active requested action by action id.")
-    execute_action_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
+    execute_action_cmd.add_argument("--workflow-root", default=default_workflow_root_str)
     execute_action_cmd.add_argument("--action-id", required=True)
     execute_action_cmd.add_argument("--json", action="store_true")
     execute_action_cmd.set_defaults(func=run_cli_command)
 
     analyze_failure_cmd = sub.add_parser("analyze-failure", help="Run bounded failure analysis for a recorded failure id.")
-    analyze_failure_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
+    analyze_failure_cmd.add_argument("--workflow-root", default=default_workflow_root_str)
     analyze_failure_cmd.add_argument("--failure-id", required=True)
     analyze_failure_cmd.add_argument("--json", action="store_true")
     analyze_failure_cmd.set_defaults(func=run_cli_command)
@@ -1504,7 +1788,7 @@ def configure_subcommands(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     migrate_fs_cmd.add_argument(
         "--workflow-root",
         type=Path,
-        default=DEFAULT_WORKFLOW_ROOT,
+        default=default_workflow_root_path,
         help="Workflow root to migrate (default: %(default)s)",
     )
     migrate_fs_cmd.set_defaults(handler=cmd_migrate_filesystem, func=run_cli_command)
@@ -1516,7 +1800,7 @@ def configure_subcommands(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     migrate_systemd_cmd.add_argument(
         "--workflow-root",
         type=Path,
-        default=DEFAULT_WORKFLOW_ROOT,
+        default=default_workflow_root_path,
     )
     migrate_systemd_cmd.set_defaults(handler=cmd_migrate_systemd, func=run_cli_command)
 
@@ -1524,7 +1808,7 @@ def configure_subcommands(parser: argparse.ArgumentParser) -> argparse.ArgumentP
         "watch",
         help="Live operator TUI: lanes, alerts, recent events.",
     )
-    watch_cmd.add_argument("--workflow-root", type=Path, default=DEFAULT_WORKFLOW_ROOT)
+    watch_cmd.add_argument("--workflow-root", type=Path, default=default_workflow_root_path)
     watch_cmd.add_argument("--once", action="store_true", help="Render one frame and exit (default when stdout is not a TTY).")
     watch_cmd.add_argument("--interval", type=float, default=2.0, help="Poll interval in live mode.")
     watch_cmd.set_defaults(handler=_lazy_cmd_watch, func=run_cli_command)
@@ -1533,7 +1817,7 @@ def configure_subcommands(parser: argparse.ArgumentParser) -> argparse.ArgumentP
         "set-observability",
         help="Override observability config for a workflow (writes runtime override file).",
     )
-    set_obs_cmd.add_argument("--workflow-root", type=Path, default=DEFAULT_WORKFLOW_ROOT)
+    set_obs_cmd.add_argument("--workflow-root", type=Path, default=default_workflow_root_path)
     set_obs_cmd.add_argument("--workflow", required=True, help="Workflow name (e.g. code-review)")
     set_obs_cmd.add_argument("--github-comments", choices=["on", "off", "unset"], required=True)
     set_obs_cmd.set_defaults(handler=cmd_set_observability, func=run_cli_command)
@@ -1542,13 +1826,13 @@ def configure_subcommands(parser: argparse.ArgumentParser) -> argparse.ArgumentP
         "get-observability",
         help="Show effective observability config + which layer (default/yaml/override) won.",
     )
-    get_obs_cmd.add_argument("--workflow-root", type=Path, default=DEFAULT_WORKFLOW_ROOT)
+    get_obs_cmd.add_argument("--workflow-root", type=Path, default=default_workflow_root_path)
     get_obs_cmd.add_argument("--workflow", required=True)
     get_obs_cmd.set_defaults(handler=cmd_get_observability, func=run_cli_command)
 
     scaffold_cmd = sub.add_parser(
         "scaffold-workflow",
-        help="Create a new workflow root and starter config/workflow.yaml.",
+        help="Create a new workflow root and starter WORKFLOW.md.",
     )
     scaffold_cmd.add_argument(
         "--workflow-root",
@@ -1564,6 +1848,20 @@ def configure_subcommands(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     scaffold_cmd.add_argument("--force", action="store_true")
     scaffold_cmd.add_argument("--json", action="store_true")
     scaffold_cmd.set_defaults(handler=cmd_scaffold_workflow, func=run_cli_command)
+
+    bootstrap_cmd = sub.add_parser(
+        "bootstrap",
+        help="Infer repo settings from the current git checkout and scaffold a starter WORKFLOW.md.",
+    )
+    bootstrap_cmd.add_argument("--repo-path", type=Path, help="Git checkout to inspect (defaults to current working directory).")
+    bootstrap_cmd.add_argument("--workflow-root", type=Path, help="Optional explicit workflow root override.")
+    bootstrap_cmd.add_argument("--workflow", default="code-review", choices=["code-review"])
+    bootstrap_cmd.add_argument("--github-slug", help="Override the inferred GitHub slug from git origin.")
+    bootstrap_cmd.add_argument("--active-lane-label", default="active-lane")
+    bootstrap_cmd.add_argument("--engine-owner", default="hermes", choices=["hermes", "openclaw"])
+    bootstrap_cmd.add_argument("--force", action="store_true")
+    bootstrap_cmd.add_argument("--json", action="store_true")
+    bootstrap_cmd.set_defaults(handler=cmd_bootstrap_workflow, func=run_cli_command)
 
     return parser
 
@@ -1653,7 +1951,7 @@ def execute_namespace(args: argparse.Namespace) -> dict[str, Any]:
     if workflow_root is not None and daedalus is not None and getattr(args, "daedalus_command", None):
         _record_operator_command_event(workflow_root=workflow_root, args=args, daedalus=daedalus)
     command = getattr(args, "daedalus_command", None)
-    project_key_commands = {"init", "start", "service-install", "run-shadow", "run-active"}
+    project_key_commands = {"init", "start", "service-install", "service-up", "run-shadow", "run-active"}
     resolved_project_key = (
         _resolved_project_key(
             daedalus=daedalus,
@@ -1688,6 +1986,15 @@ def execute_namespace(args: argparse.Namespace) -> dict[str, Any]:
         )
     if args.daedalus_command == "service-install":
         return install_supervised_service(
+            workflow_root=workflow_root,
+            project_key=resolved_project_key,
+            instance_id=args.instance_id,
+            interval_seconds=args.interval_seconds,
+            service_name=args.service_name,
+            service_mode=args.service_mode,
+        )
+    if args.daedalus_command == "service-up":
+        return service_up(
             workflow_root=workflow_root,
             project_key=resolved_project_key,
             instance_id=args.instance_id,
@@ -1872,6 +2179,15 @@ def render_result(
         return _fmt(result)
     if command == "service-install":
         return f"service installed mode={result.get('service_mode')} unit={result.get('unit_path')} ok={result.get('installed')}"
+    if command == "service-up":
+        status = result.get("service_status") or {}
+        preflight = result.get("preflight") or {}
+        return (
+            f"service up mode={result.get('service_mode')} "
+            f"workflow={preflight.get('workflow')} "
+            f"enabled={status.get('enabled')} active={status.get('active')} "
+            f"service={status.get('service_name')}"
+        )
     if command == "service-uninstall":
         return f"service uninstalled mode={result.get('service_mode')} unit={result.get('unit_path')} ok={result.get('uninstalled')}"
     if command in {"service-start", "service-stop", "service-restart", "service-enable", "service-disable"}:
@@ -1960,7 +2276,7 @@ def execute_workflow_command(raw_args: str) -> str:
     Single arg (workflow name): shows that workflow's ``--help``.
     Full invocation: routes through ``workflows.run_cli`` with
     ``require_workflow=<name>`` so the dispatcher pins the named module
-    regardless of what the workflow.yaml declares.
+    regardless of what the workflow contract declares.
     """
     workflow_root = resolve_default_workflow_root()
     parts = raw_args.strip().split() if raw_args else []
@@ -2016,6 +2332,8 @@ def execute_raw_args(raw_args: str) -> str:
             return cmd_get_observability(args, parser)
         if args.daedalus_command == "scaffold-workflow":
             return cmd_scaffold_workflow(args, parser)
+        if args.daedalus_command == "bootstrap":
+            return cmd_bootstrap_workflow(args, parser)
         result = execute_namespace(args)
         fmt = _resolve_format(getattr(args, "format", None), getattr(args, "json", False))
         return render_result(args.daedalus_command, result, output_format=fmt)
@@ -2042,6 +2360,7 @@ def run_cli_command(args: argparse.Namespace) -> None:
         "set-observability",
         "get-observability",
         "scaffold-workflow",
+        "bootstrap",
     }
     if getattr(args, "daedalus_command", None) in string_returning:
         handler = getattr(args, "handler", None)

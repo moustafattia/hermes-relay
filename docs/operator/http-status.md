@@ -4,7 +4,7 @@ Symphony §13.7. Optional localhost HTTP server that exposes lane state, recent 
 
 ## Enable it
 
-Add `server.port` to `workflow.yaml`:
+Add `server.port` to `WORKFLOW.md`:
 
 ```yaml
 server:

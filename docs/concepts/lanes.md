@@ -53,7 +53,7 @@ States with no outgoing arrows in this diagram (other than terminal `merged` / `
 
 ## Lane selection
 
-Not every labeled issue becomes a lane. `lane_selection.py` filters and ranks issues using the `lane-selection:` block in `workflow.yaml`.
+Not every labeled issue becomes a lane. `lane_selection.py` filters and ranks issues using the `lane-selection:` block in the workflow contract (`WORKFLOW.md` for new instances).
 
 ### Config schema
 

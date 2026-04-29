@@ -15,6 +15,7 @@ from workflows.contract import (
 )
 
 DEFAULT_WORKFLOW_ROOT_ENV_VARS = ("DAEDALUS_WORKFLOW_ROOT",)
+REPO_LOCAL_WORKFLOW_POINTER_RELATIVE_PATH = Path(".hermes") / "daedalus" / "workflow-root"
 
 _PROJECT_KEY_CHARS_RE = re.compile(r"[^a-z0-9._-]+")
 _PROJECT_KEY_SEPARATORS_RE = re.compile(r"[-._]{2,}")
@@ -53,6 +54,10 @@ def workflow_config_path(workflow_root: Path) -> Path:
 
 def workflow_markdown_path(workflow_root: Path) -> Path:
     return _workflow_markdown_path(workflow_root)
+
+
+def repo_local_workflow_pointer_path(repo_root: Path) -> Path:
+    return repo_root.resolve() / REPO_LOCAL_WORKFLOW_POINTER_RELATIVE_PATH
 
 
 def workflow_contract_path(workflow_root: Path) -> Path:
@@ -190,10 +195,24 @@ def workflow_cli_argv(workflow_root: Path, *command_args: str) -> list[str]:
 def _find_workflow_root(start: Path) -> Path | None:
     path = start.expanduser().resolve()
     for candidate in (path, *path.parents):
-        if workflow_config_path(candidate).exists():
-            return candidate
         if workflow_markdown_path(candidate).exists() and _is_discoverable_markdown_workflow_root(candidate):
             return candidate
+        if workflow_config_path(candidate).exists():
+            return candidate
+        pointer_path = repo_local_workflow_pointer_path(candidate)
+        if pointer_path.exists():
+            try:
+                pointer_value = pointer_path.read_text(encoding="utf-8").strip()
+            except OSError:
+                pointer_value = ""
+            if pointer_value:
+                target = Path(pointer_value).expanduser()
+                if not target.is_absolute():
+                    target = (candidate / target).resolve()
+                else:
+                    target = target.resolve()
+                if find_workflow_contract_path(target) is not None:
+                    return target
     return None
 
 
@@ -218,8 +237,8 @@ def resolve_default_workflow_root(
 
     plugin_dir = plugin_root_path(plugin_dir=plugin_dir)
     repo_parent = plugin_dir.parent.resolve()
-    if workflow_config_path(repo_parent).exists():
-        return repo_parent
     if workflow_markdown_path(repo_parent).exists() and _is_discoverable_markdown_workflow_root(repo_parent):
+        return repo_parent
+    if workflow_config_path(repo_parent).exists():
         return repo_parent
     return cwd_path

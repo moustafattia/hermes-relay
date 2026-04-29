@@ -12,10 +12,10 @@ expose `NAME`, `SUPPORTED_SCHEMA_VERSIONS`, `CONFIG_SCHEMA_PATH`,
 
 ## Naming
 
-- Workflow type: external contract in `workflow.yaml`, always `lower-kebab-case` such as `code-review`.
+- Workflow type: external contract in `WORKFLOW.md` front matter, always `lower-kebab-case` such as `code-review`.
 - Workflow package: Python slug under `workflows/`, always `lower_snake_case` such as `code_review/`.
 - Workflow instance root: directory under `~/.hermes/workflows/`, always `<owner>-<repo>-<workflow-type>`.
-- `instance.name` in `workflow.yaml` should match the workflow root directory name.
+- `instance.name` in `WORKFLOW.md` should match the workflow root directory name.
 
 ## Layout
 
@@ -34,7 +34,7 @@ workflows/
     ├── lane_selection.py    # picks which issues become active lanes
     ├── stall.py             # stall detection (Symphony §8.5)
     ├── config_snapshot.py   # AtomicRef-backed hot-reload (Symphony §6.2)
-    ├── config_watcher.py    # file watcher for workflow.yaml
+    ├── config_watcher.py    # file watcher for the workflow contract
     ├── event_taxonomy.py    # Symphony-aligned event names (§10.4)
     ├── github.py            # GitHub API surface (issues, PRs, labels)
     ├── reviews.py           # review aggregation across reviewer agents
@@ -60,8 +60,8 @@ workflows/
 
 ## How a workflow runs
 
-1. Daedalus's tick loop loads `workflow.yaml` from the project's
-   workspace directory.
+1. Daedalus's tick loop loads `WORKFLOW.md` from the workflow root
+   (or legacy `config/workflow.yaml` when migrating older instances).
 2. The dispatcher imports the workflow package referenced by
    `workflow:` in the config (e.g. `code-review`).
 3. `make_workspace(workflow_root, config)` returns the workspace
@@ -76,7 +76,7 @@ workflows/
 2. Add a `schema.yaml` defining the workflow's config shape.
 3. Implement `cli_main(workspace, argv)` so operators can run
    `/workflow <your-name> status` and friends.
-4. Reference it from `workflow.yaml` in the project workspace:
+4. Reference it from `WORKFLOW.md` front matter in the workflow root:
    `workflow: <your-name>`.
 
 The `code_review/` package is the reference implementation — start by

@@ -4,7 +4,7 @@ Each subdirectory under `projects/` is one **project pack** — optional
 playground material for a specific repository or operator setup.
 
 Project packs are not the public workflow contract. The engine is
-configured from `<workflow-root>/config/workflow.yaml`; `projects/` is
+configured from `<workflow-root>/WORKFLOW.md`; `projects/` is
 where you keep project-specific docs, helper skills, and local metadata
 that you do not want in the generic plugin surface.
 
@@ -41,6 +41,6 @@ fresh clone.
    `projects/<your-slug>/workspace/README.md` placeholders.
 3. Add `projects/<your-slug>/docs/` and `projects/<your-slug>/skills/`
    if you need project-only runbooks or automations.
-4. Point your real workflow root's `config/workflow.yaml` at the repo
+4. Point your real workflow root's `WORKFLOW.md` at the repo
    and policy for that project. Daedalus selects work by
    `--workflow-root`, not by project-pack slug.

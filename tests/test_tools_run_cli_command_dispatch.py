@@ -13,6 +13,7 @@ These tests pin ``run_cli_command`` so it dispatches the string-returning
 handlers directly.
 """
 import importlib.util
+import subprocess
 from pathlib import Path
 
 
@@ -112,4 +113,35 @@ def test_run_cli_command_dispatches_scaffold_workflow(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "unknown daedalus command" not in out, out
     assert "scaffolded workflow root" in out
-    assert (root / "config" / "workflow.yaml").exists()
+    assert (root / "WORKFLOW.md").exists()
+
+
+def test_run_cli_command_dispatches_bootstrap(tmp_path, capsys, monkeypatch):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True, text=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", "git@github.com:attmous/daedalus.git"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+
+    tools = _tools()
+    args = _parse(
+        tools,
+        [
+            "bootstrap",
+            "--repo-path",
+            str(repo),
+        ],
+    )
+    tools.run_cli_command(args)
+    out = capsys.readouterr().out
+    assert "unknown daedalus command" not in out, out
+    assert "bootstrapped workflow root" in out
+    assert (home / ".hermes" / "workflows" / "attmous-daedalus-code-review" / "WORKFLOW.md").exists()

@@ -2,7 +2,8 @@ import importlib.util
 from pathlib import Path
 
 import pytest
-import yaml
+
+from workflows.contract import WORKFLOW_POLICY_KEY, load_workflow_contract_file
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1] / "daedalus"
@@ -35,16 +36,17 @@ def test_scaffold_workflow_writes_config_and_layout(tmp_path):
         force=False,
     )
 
-    config_path = root / "config" / "workflow.yaml"
-    cfg = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    contract_path = root / "WORKFLOW.md"
+    cfg = load_workflow_contract_file(contract_path).config
 
-    assert result["config_path"] == str(config_path)
+    assert result["contract_path"] == str(contract_path)
     assert cfg["instance"]["name"] == "attmous-daedalus-code-review"
     assert cfg["instance"]["engine-owner"] == "hermes"
     assert cfg["repository"]["github-slug"] == "attmous/daedalus"
     assert cfg["repository"]["active-lane-label"] == "ready-for-daedalus"
     assert cfg["triggers"]["lane-selector"]["label"] == "ready-for-daedalus"
     assert cfg["repository"]["local-path"] == str(root / "workspace" / "repo")
+    assert cfg[WORKFLOW_POLICY_KEY]
     assert (root / "memory").is_dir()
     assert (root / "state" / "sessions").is_dir()
     assert (root / "runtime" / "state" / "daedalus").is_dir()
@@ -55,9 +57,9 @@ def test_scaffold_workflow_writes_config_and_layout(tmp_path):
 def test_scaffold_workflow_refuses_to_overwrite_without_force(tmp_path):
     tools = _tools()
     root = tmp_path / "attmous-daedalus-code-review"
-    config_path = root / "config" / "workflow.yaml"
-    config_path.parent.mkdir(parents=True)
-    config_path.write_text("workflow: code-review\n", encoding="utf-8")
+    contract_path = root / "WORKFLOW.md"
+    contract_path.parent.mkdir(parents=True)
+    contract_path.write_text("---\nworkflow: code-review\nschema-version: 1\n---\n", encoding="utf-8")
 
     try:
         tools.scaffold_workflow_root(
@@ -70,7 +72,7 @@ def test_scaffold_workflow_refuses_to_overwrite_without_force(tmp_path):
             force=False,
         )
     except tools.DaedalusCommandError as exc:
-        assert "refusing to overwrite existing config" in str(exc)
+        assert "refusing to overwrite existing workflow contract" in str(exc)
         return
     raise AssertionError("expected DaedalusCommandError when overwriting without --force")
 
@@ -78,9 +80,9 @@ def test_scaffold_workflow_refuses_to_overwrite_without_force(tmp_path):
 def test_scaffold_workflow_force_replaces_existing_config(tmp_path):
     tools = _tools()
     root = tmp_path / "attmous-daedalus-code-review"
-    config_path = root / "config" / "workflow.yaml"
-    config_path.parent.mkdir(parents=True)
-    config_path.write_text("workflow: old\n", encoding="utf-8")
+    contract_path = root / "WORKFLOW.md"
+    contract_path.parent.mkdir(parents=True)
+    contract_path.write_text("---\nworkflow: old\nschema-version: 1\n---\n", encoding="utf-8")
 
     tools.scaffold_workflow_root(
         workflow_root=root,
@@ -92,11 +94,32 @@ def test_scaffold_workflow_force_replaces_existing_config(tmp_path):
         force=True,
     )
 
-    cfg = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    cfg = load_workflow_contract_file(contract_path).config
     assert cfg["workflow"] == "code-review"
     assert cfg["instance"]["name"] == "attmous-daedalus-code-review"
     assert cfg["instance"]["engine-owner"] == "openclaw"
     assert cfg["repository"]["local-path"] == str(root / "workspace" / "checkout")
+
+
+def test_scaffold_workflow_force_retires_legacy_yaml_when_present(tmp_path):
+    tools = _tools()
+    root = tmp_path / "attmous-daedalus-code-review"
+    legacy_path = root / "config" / "workflow.yaml"
+    legacy_path.parent.mkdir(parents=True)
+    legacy_path.write_text("workflow: code-review\nschema-version: 1\n", encoding="utf-8")
+
+    tools.scaffold_workflow_root(
+        workflow_root=root,
+        workflow_name="code-review",
+        repo_path=None,
+        github_slug="attmous/daedalus",
+        active_lane_label="active-lane",
+        engine_owner="hermes",
+        force=True,
+    )
+
+    assert (root / "WORKFLOW.md").exists()
+    assert not legacy_path.exists()
 
 
 def test_scaffold_workflow_requires_owner_repo_workflow_root_name(tmp_path):

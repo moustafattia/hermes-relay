@@ -137,7 +137,8 @@ Daedalus service
 | Command | What it does |
 |---|---|
 | `/daedalus init` | Init/migrate the runtime DB (idempotent) |
-| `/daedalus scaffold-workflow` | Create a new workflow root named `<owner>-<repo>-<workflow-type>` with a starter `config/workflow.yaml` |
+| `/daedalus bootstrap` | Infer repo root + GitHub slug from the current checkout, create a starter workflow root, and persist a repo-local workflow pointer |
+| `/daedalus scaffold-workflow` | Create a new workflow root named `<owner>-<repo>-<workflow-type>` with a starter `WORKFLOW.md` |
 | `/daedalus ingest-live` | Pull workflow CLI status into the ledger |
 | `/daedalus heartbeat` | Refresh the runtime lease |
 | `/daedalus request-active-actions` | Inspect what *would* be dispatched on the next tick |
@@ -148,7 +149,8 @@ Daedalus service
 
 | Command | What it does |
 |---|---|
-| `/daedalus service-install` | Install + enable the user unit |
+| `/daedalus service-up` | Validate `WORKFLOW.md`, then install, enable, and start the user unit |
+| `/daedalus service-install` | Install the user unit only |
 | `/daedalus service-uninstall` | Stop + remove the user unit |
 | `/daedalus service-start` | Start `daedalus-active@<workspace>.service` |
 | `/daedalus service-stop` | Stop the service |

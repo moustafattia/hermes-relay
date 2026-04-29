@@ -5,6 +5,7 @@ __pycache__/
 .pytest_cache/
 .DS_Store
 .claude/
+.hermes/daedalus/workflow-root
 build/
 dist/
 *.egg-info/

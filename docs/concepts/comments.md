@@ -32,7 +32,7 @@ observability:
 ### Resolution precedence
 
 1. **Override file** (`observability-overrides.json`) — set via `/daedalus set-observability`
-2. **`workflow.yaml`** `observability:` block
+2. **`WORKFLOW.md`** `observability:` block
 3. **Hardcoded defaults** (everything off)
 
 See [observability.md](observability.md) for the full override surface.

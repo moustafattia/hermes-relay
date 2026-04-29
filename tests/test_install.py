@@ -25,7 +25,7 @@ def test_install_into_default_hermes_home_copies_plugin_tree(tmp_path):
     assert (plugin_dir / "runtime.py").exists()
     assert (plugin_dir / "alerts.py").exists()
     assert (plugin_dir / "workflows" / "code_review" / "status.py").exists()
-    assert (plugin_dir / "workflows" / "code_review" / "workflow.template.yaml").exists()
+    assert (plugin_dir / "workflows" / "code_review" / "workflow.template.md").exists()
     assert list((plugin_dir / "projects").glob("*/config/project.json"))
     assert (plugin_dir / "skills" / "operator" / "SKILL.md").exists()
 

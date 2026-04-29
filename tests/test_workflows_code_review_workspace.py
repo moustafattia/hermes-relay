@@ -91,6 +91,7 @@ def test_make_workspace_exposes_config_constants_and_primitives(tmp_path):
     assert ws.INTER_REVIEW_AGENT_MODEL == "claude-sonnet-4-6"
     assert ws.INTERNAL_REVIEWER_AGENT_NAME == "Internal_Reviewer_Agent"
     assert ws.LANE_FAILURE_RETRY_BUDGET == 3
+    assert ws.WORKFLOW_POLICY == ""
     # I/O primitives
     assert callable(ws._run)
     assert callable(ws._now_iso)
@@ -110,6 +111,28 @@ def test_workspace_engine_owner_selects_hermes_cron_jobs_path(tmp_path):
     config["engineOwner"] = "openclaw"
     ws2 = workspace_module.make_workspace(workspace_root=tmp_path, config=config)
     assert ws2._jobs_store_path() == Path(config["cronJobsPath"])
+
+
+def test_workspace_uses_workflow_policy_from_workflow_contract(tmp_path):
+    workspace_module = load_module("daedalus_workflows_code_review_workspace_test", "workflows/code_review/workspace.py")
+    cfg = _workflow_yaml_config(tmp_path)
+    cfg["workflow-policy"] = "Never widen scope."
+
+    ws = workspace_module.make_workspace(workspace_root=tmp_path, config=cfg)
+    prompt = ws._render_implementation_dispatch_prompt(
+        issue={"number": 224, "title": "Issue 224", "url": "https://example.test/issues/224"},
+        issue_details={"body": "Issue body"},
+        worktree=tmp_path / "repo",
+        lane_memo_path=None,
+        lane_state_path=None,
+        open_pr=None,
+        action="restart-session",
+        workflow_state="implementing_local",
+    )
+
+    assert ws.WORKFLOW_POLICY == "Never widen scope."
+    assert "# Shared Workflow Policy" in prompt
+    assert "Never widen scope." in prompt
 
 
 def test_workspace_audit_appends_jsonl(tmp_path):

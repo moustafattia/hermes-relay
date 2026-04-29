@@ -54,8 +54,8 @@ Daedalus warned Icarus, then flew home. Edits take effect on the next tick. A ba
 
 ## What's in the box
 
-- **Configurable agent per role.** Pick which agent and model handles each role in your workflow — Codex for review, Claude for code, your own agent for merge. Set in `workflow.yaml`.
-- **Hot-reload.** Edit `workflow.yaml` and the next tick picks it up. Bad edits don't crash the loop; they get ignored until you fix them.
+- **Configurable agent per role.** Pick which agent and model handles each role in your workflow — Codex for review, Claude for code, your own agent for merge. Set in `WORKFLOW.md`.
+- **Hot-reload.** Edit `WORKFLOW.md` and the next tick picks it up. Bad edits don't crash the loop; they get ignored until you fix them.
 - **Stall detection.** Wedged agents get terminated automatically and the lane retries. No zombie workers.
 - **Symphony-aligned event vocabulary** — events follow the [openai/symphony](https://github.com/openai/symphony) taxonomy, so observability tools work across systems.
 - **Operator commands** — `/daedalus status`, `/daedalus doctor`, `/workflow code-review status`, `/workflow code-review tick`.
@@ -71,7 +71,7 @@ Daedalus is ready to publish on one explicit path:
 - **Workflow root:** `~/.hermes/workflows/<owner>-<repo>-<workflow-type>`
 - **Host Python:** `python3` with `yaml` and `jsonschema` available
 - **24/7 supervision:** `systemd --user`
-- **Runtime adapters:** whatever `workflow.yaml` names must exist on the host (`acpx-codex`, `claude-cli`, `hermes-agent`, ...).
+- **Runtime adapters:** whatever `WORKFLOW.md` names must exist on the host (`acpx-codex`, `claude-cli`, `hermes-agent`, ...).
 
 If you want the exact operator contract we support, read [docs/public-contract.md](docs/public-contract.md).
 
@@ -85,19 +85,53 @@ sudo apt install python3-yaml python3-jsonschema
 # 2. Install and enable the plugin
 hermes plugins install attmous/daedalus --enable
 
-# 3. Scaffold one workflow instance
+# 3. Bootstrap one workflow instance from your repo checkout
+cd /path/to/your/repo
+hermes daedalus bootstrap
+```
+
+`bootstrap` infers the git repo root, derives `github-slug` from `origin`, and
+creates:
+
+```text
+~/.hermes/workflows/<owner>-<repo>-<workflow-type>
+```
+
+It also writes a repo-local pointer at:
+
+```text
+./.hermes/daedalus/workflow-root
+```
+
+So later `hermes daedalus ...` commands can resolve the workflow root directly
+from the repo checkout.
+
+If you need explicit control, the lower-level command is still available:
+
+```bash
 hermes daedalus scaffold-workflow \
   --workflow-root ~/.hermes/workflows/your-org-your-repo-code-review \
   --github-slug your-org/your-repo
 ```
 
-Edit `~/.hermes/workflows/your-org-your-repo-code-review/config/workflow.yaml` before starting the engine:
+Edit `~/.hermes/workflows/your-org-your-repo-code-review/WORKFLOW.md` before starting the engine:
 
 - set `repository.local-path`
 - confirm the runtime kinds you actually have installed
 - tune agents/models/gates for your repo
 
+The YAML front matter is the machine config. The Markdown body below it is the
+shared workflow policy Daedalus applies across its role-specific prompts.
+
 Then initialize, verify, and supervise it:
+
+```bash
+hermes daedalus service-up
+```
+
+`service-up` initializes the runtime, validates `WORKFLOW.md`, installs the
+user systemd unit, enables it, and starts it. If you want to inspect before
+starting, the lower-level commands still exist:
 
 ```bash
 hermes daedalus init \
@@ -106,27 +140,18 @@ hermes daedalus init \
 hermes daedalus doctor \
   --workflow-root ~/.hermes/workflows/your-org-your-repo-code-review \
   --format json
-
-hermes daedalus service-install \
-  --workflow-root ~/.hermes/workflows/your-org-your-repo-code-review \
-  --service-mode active
-
-hermes daedalus service-enable \
-  --workflow-root ~/.hermes/workflows/your-org-your-repo-code-review \
-  --service-mode active
-
-hermes daedalus service-start \
-  --workflow-root ~/.hermes/workflows/your-org-your-repo-code-review \
-  --service-mode active
 ```
 
 Start Hermes in your repo:
 
 ```bash
-export DAEDALUS_WORKFLOW_ROOT=~/.hermes/workflows/your-org-your-repo-code-review
 cd /path/to/your/repo
 hermes
 ```
+
+Daedalus resolves the workflow root from the repo-local pointer written by
+`bootstrap`. `DAEDALUS_WORKFLOW_ROOT` remains available when you need to
+override it explicitly.
 
 Inside Hermes:
 
@@ -172,7 +197,7 @@ flowchart LR
 
   subgraph DAEDALUS["Daedalus engine"]
     direction TB
-    WF["workflow.yaml<br/>stages, roles, gates"]
+    WF["WORKFLOW.md<br/>stages, roles, gates"]
     LANE["Lane<br/>one run per active issue"]
     WF -.-> LANE
   end
@@ -191,12 +216,12 @@ flowchart LR
   AGENTS ==> PR
 ```
 
-A **labeled issue** is the trigger. The **engine** ticks; for every active issue, it spins up a **lane** — one run of the workflow defined in `workflow.yaml` — and dispatches to the **agent** configured for the current stage. Agents write commits, post review comments, and eventually merge. When the workflow's last gate clears, the PR closes the loop.
+A **labeled issue** is the trigger. The **engine** ticks; for every active issue, it spins up a **lane** — one run of the workflow defined in `WORKFLOW.md` — and dispatches to the **agent** configured for the current stage. Agents write commits, post review comments, and eventually merge. When the workflow's last gate clears, the PR closes the loop.
 
 ## Philosophy
 
 - **State is tracked, not guessed.** The workflow always knows where each issue stands.
-- **A bad edit in the workflow.yaml doesn't crash anything.** It just gets ignored until you fix it.
+- **A bad edit in `WORKFLOW.md` doesn't crash anything.** It just gets ignored until you fix it.
 - **Recovery is automatic.** Lost workers never block forward motion.
 - **No packaging theater.** This is a plugin payload — flat top level, on purpose.
 - **`--json` is the default operator dialect.** Humans read formatters, scripts read JSON.
