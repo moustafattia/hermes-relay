@@ -1,10 +1,5 @@
-"""Tests for the plugin-side entrypoint ``workflows.code_review.__main__``.
-
-The entrypoint lets external callers drop the workspace-side
-``scripts/yoyopod_workflow.py`` wrapper by invoking the plugin directly.
-"""
+"""Tests for the per-workflow ``workflows.code_review.__main__`` entrypoint."""
 import importlib.util
-import json
 from pathlib import Path
 
 
@@ -39,7 +34,7 @@ def _minimal_config(tmp_path: Path) -> dict:
 
 def test_resolve_workflow_root_explicit_flag_wins(tmp_path, monkeypatch):
     main_module = load_module("daedalus_workflows_code_review_main_test", "workflows/code_review/__main__.py")
-    monkeypatch.delenv("YOYOPOD_WORKFLOW_ROOT", raising=False)
+    monkeypatch.delenv("DAEDALUS_WORKFLOW_ROOT", raising=False)
     root, remaining = main_module.resolve_workflow_root([
         "--workflow-root", str(tmp_path / "a"), "status",
     ])
@@ -49,7 +44,7 @@ def test_resolve_workflow_root_explicit_flag_wins(tmp_path, monkeypatch):
 
 def test_resolve_workflow_root_equals_form(tmp_path, monkeypatch):
     main_module = load_module("daedalus_workflows_code_review_main_test", "workflows/code_review/__main__.py")
-    monkeypatch.delenv("YOYOPOD_WORKFLOW_ROOT", raising=False)
+    monkeypatch.delenv("DAEDALUS_WORKFLOW_ROOT", raising=False)
     root, remaining = main_module.resolve_workflow_root([
         f"--workflow-root={tmp_path / 'b'}", "tick", "--json",
     ])
@@ -59,7 +54,7 @@ def test_resolve_workflow_root_equals_form(tmp_path, monkeypatch):
 
 def test_resolve_workflow_root_env_fallback(tmp_path, monkeypatch):
     main_module = load_module("daedalus_workflows_code_review_main_test", "workflows/code_review/__main__.py")
-    monkeypatch.setenv("YOYOPOD_WORKFLOW_ROOT", str(tmp_path / "env-root"))
+    monkeypatch.setenv("DAEDALUS_WORKFLOW_ROOT", str(tmp_path / "env-root"))
     root, remaining = main_module.resolve_workflow_root(["status"])
     assert root == (tmp_path / "env-root").resolve()
     assert remaining == ["status"]
@@ -67,7 +62,7 @@ def test_resolve_workflow_root_env_fallback(tmp_path, monkeypatch):
 
 def test_resolve_workflow_root_requires_value(tmp_path, monkeypatch):
     main_module = load_module("daedalus_workflows_code_review_main_test", "workflows/code_review/__main__.py")
-    monkeypatch.delenv("YOYOPOD_WORKFLOW_ROOT", raising=False)
+    monkeypatch.delenv("DAEDALUS_WORKFLOW_ROOT", raising=False)
     import pytest
 
     with pytest.raises(SystemExit):
@@ -75,12 +70,12 @@ def test_resolve_workflow_root_requires_value(tmp_path, monkeypatch):
 
 
 def _write_workflow_yaml(config_dir: Path, config: dict) -> None:
-    """Write the workflow.yaml dispatcher handshake file and yoyopod-workflow.json."""
+    """Write a minimal workflow.yaml for the code-review workflow."""
     import yaml  # type: ignore[import]
     full_yaml_config = {
         "workflow": "code-review",
         "schema-version": 1,
-        "instance": {"name": "yoyopod", "engine-owner": "hermes"},
+        "instance": {"name": "workflow-engine", "engine-owner": "hermes"},
         "repository": {
             "local-path": str(config.get("repoPath", "/tmp/repo")),
             "github-slug": "owner/repo",
@@ -135,7 +130,6 @@ def _write_workflow_yaml(config_dir: Path, config: dict) -> None:
         yaml.dump(full_yaml_config),
         encoding="utf-8",
     )
-    (config_dir / "yoyopod-workflow.json").write_text(json.dumps(config), encoding="utf-8")
 
 
 def test_main_calls_cli_main_with_workspace(tmp_path, monkeypatch):

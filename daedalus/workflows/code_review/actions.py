@@ -14,7 +14,7 @@ from workflows.code_review.sessions import (
 )
 
 
-"""YoYoPod Core action execution helpers.
+"""Code-review workflow action execution helpers.
 
 Each ``run_*`` function below is a pure, dependency-injected implementation of
 one operator action (publish, push, merge, dispatch, tick). Callers inject

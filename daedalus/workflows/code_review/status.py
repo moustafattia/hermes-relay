@@ -35,7 +35,7 @@ from workflows.code_review.sessions import (
 from workflows.code_review.workflow import derive_next_action
 
 
-"""YoYoPod Core read-model and status helpers.
+"""Code-review workflow read-model and status helpers.
 
 Current slice behavior is intentionally conservative: the adapter establishes the
 boundary and delegates status construction to the legacy wrapper module. Later
@@ -958,7 +958,7 @@ def write_lane_state(
         },
         "memo": {
             "lastUpdatedAt": now_iso,
-            "source": "yoyopod-core",
+            "source": "code-review",
         },
     }
     _write_json_file(path, payload)

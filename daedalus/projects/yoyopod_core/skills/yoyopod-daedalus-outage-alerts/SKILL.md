@@ -52,9 +52,9 @@ Critical paging semantics are stricter than they look:
 - This keeps alert behavior aligned with doctor `overall_status` instead of escalating every critical-severity warning.
 
 ## Real-world failure mode
-The alert script can fail because it tries to load a missing plugin file:
+The alert script can fail because it tries to load a retired plugin file:
 
-`/home/radxa/.hermes/workflows/yoyopod/.hermes/plugins/daedalus/daedalus_control.py`
+`/home/radxa/.hermes/plugins/daedalus/daedalus_control.py`
 
 Observed failure mode:
 - `python3 /home/radxa/.hermes/workflows/yoyopod/scripts/daedalus_alerts.py --json`
@@ -64,8 +64,8 @@ When that happens, do not assume the workflow is down. Verify the live Daedalus 
 
 Fallback inspection path:
 1. Use the Daedalus runtime script directly, bypassing the missing alert wrapper import:
-   - `python3 /home/radxa/.hermes/workflows/yoyopod/scripts/daedalus.py status --workflow-root /home/radxa/.hermes/workflows/yoyopod --json`
-   - `python3 /home/radxa/.hermes/workflows/yoyopod/scripts/daedalus.py ownership-status --workflow-root /home/radxa/.hermes/workflows/yoyopod --json`
+   - `python3 /home/radxa/.hermes/plugins/daedalus/runtime.py status --workflow-root /home/radxa/.hermes/workflows/yoyopod --json`
+   - `python3 /home/radxa/.hermes/plugins/daedalus/runtime.py doctor --workflow-root /home/radxa/.hermes/workflows/yoyopod --json`
    These are the reliable source for current runtime health and ownership when the alert wrapper cannot import `daedalus_control.py`.
 2. If the decision script says to alert or resolve, still honor the dedupe/state-write rules exactly; the fallback only replaces status collection, not alert semantics.
 3. If the Telegram target name ever needs resolving, use the messaging directory first (`send_message(action='list')`) and then send exactly one message to the resolved target.

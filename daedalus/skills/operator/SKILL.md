@@ -1,6 +1,6 @@
 ---
 name: operator
-description: Operate the YoYoPod Daedalus project plugin control surface for status checks and shadow-runtime commands.
+description: Operate the Daedalus plugin control surface for status checks and shadow-runtime commands.
 version: 0.1.0
 author: Hermes Agent
 license: MIT
@@ -8,15 +8,15 @@ license: MIT
 
 # Daedalus Operator
 
-Use this when the YoYoPod workflow repo-local `daedalus` plugin is enabled.
+Use this when the global `daedalus` plugin is installed at `~/.hermes/plugins/daedalus`.
 
 ## Enable project plugin discovery
 
-Run Hermes from the YoYoPod workflow root with:
+Run Hermes from the workflow root with:
 
 ```bash
 export HERMES_ENABLE_PROJECT_PLUGINS=true
-cd ~/.hermes/workflows/yoyopod
+cd ~/.hermes/workflows/<owner>-<repo>-<workflow-type>
 hermes
 ```
 
@@ -52,12 +52,13 @@ Inside Hermes sessions:
 
 ## Notes
 
-- Default workflow root is the current YoYoPod workflow repo.
+- Default workflow root is detected from the current directory or `DAEDALUS_WORKFLOW_ROOT`.
+- Workflow root directories should be named `<owner>-<repo>-<workflow-type>`, and `instance.name` in `workflow.yaml` should match.
 - Use `--workflow-root` to point at a different test root.
-- Service commands default to the shadow observer profile. Add `--service-mode active` to manage the guarded executor profile (`daedalus-active@yoyopod.service`).
+- Service commands default to the shadow observer profile. Add `--service-mode active` to manage the guarded executor profile (`daedalus-active@<owner>-<repo>-<workflow-type>.service`).
 - `service-install` resolves profile defaults automatically:
-  - shadow: `daedalus-shadow@yoyopod.service` + `relay-shadow-service-1` + `run-shadow`
-  - active: `daedalus-active@yoyopod.service` + `relay-active-service-1` + `run-active`
+  - shadow: `daedalus-shadow@<owner>-<repo>-<workflow-type>.service` + `relay-shadow-service-1` + `run-shadow`
+  - active: `daedalus-active@<owner>-<repo>-<workflow-type>.service` + `relay-active-service-1` + `run-active`
 - `run-shadow` remains shadow-only: it derives and records actions but does not execute active side effects.
 - `iterate-active` / `run-active` are guarded: they will only execute actions when Daedalus active execution is enabled, the runtime is in `active` mode, and current Daedalus-vs-wrapper parity is still compatible.
 - `set-active-execution --enabled true|false` toggles the guarded executor directly. Pair it with the supervised active service when you want a real executor instead of manual active runs.
@@ -252,7 +253,7 @@ The workflow ledger renames two `reviews.*` keys for provider neutrality:
 
 **Action-type literal.** The transient action `run_claude_review` is renamed to `run_internal_review`. The dispatcher accepts both for one release.
 
-**What this means for you:** nothing — the rename is transparent. If you write external tooling that reads the ledger directly (e.g., a dashboard parsing `yoyopod-workflow-status.json`), update it to use `reviews.internalReview` / `reviews.externalReview`.
+**What this means for you:** nothing — the rename is transparent. If you write external tooling that reads the ledger directly (e.g., a dashboard parsing `workflow-status.json`), update it to use `reviews.internalReview` / `reviews.externalReview`.
 
 ## Deprecation cleanup (Phase D-2)
 
@@ -278,7 +279,7 @@ Plus `claudeModel` is dropped entirely — its value lives in `internalReviewerM
 
 **Read-both / write-new** for one release via the new `get_ledger_field(ledger, new_key)` helper.
 
-**Status output keys also renamed** — external tooling that parsed `claudeModel` / `interReviewAgentModel` / `codexCloudAutoResolved` / `lastClaudeVerdict` from `yoyopod-workflow-status.json` should switch to the new names.
+**Status output keys also renamed** — external tooling that parsed `claudeModel` / `interReviewAgentModel` / `codexCloudAutoResolved` / `lastClaudeVerdict` from `workflow-status.json` should switch to the new names.
 
 **Workspace internals.** Four `_codex_cloud_repair_handoff_*` shims in `workflows/code_review/workspace.py` renamed to `_external_review_repair_handoff_*`. Workspace-internal API; affects subagent test fixtures only.
 
@@ -299,4 +300,4 @@ Two nested lane-state fields renamed for provider neutrality:
 
 **Migration is automatic** on workspace bootstrap (extends D-1/D-3 mechanism).
 **Read-both / write-new** for one release via `get_lane_state_review_field` helper.
-**Status output keys also renamed** — external tooling reading `lastClaudeReviewedHeadSha` / `localClaudeReviewCount` from `yoyopod-workflow-status.json` should switch to the new names.
+**Status output keys also renamed** — external tooling reading `lastClaudeReviewedHeadSha` / `localClaudeReviewCount` from `workflow-status.json` should switch to the new names.

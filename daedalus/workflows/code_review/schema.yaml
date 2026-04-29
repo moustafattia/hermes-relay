@@ -22,7 +22,9 @@ properties:
     type: object
     required: [name, engine-owner]
     properties:
-      name: {type: string}
+      name:
+        type: string
+        description: "Workflow instance id. New roots should use <owner>-<repo>-<workflow-type> and match the directory name under ~/.hermes/workflows/."
       engine-owner: {type: string, enum: [hermes, openclaw]}
 
   repository:
@@ -152,6 +154,21 @@ properties:
             properties:
               channel: {type: string}
               chat-id: {type: string}
+
+  jobs:
+    type: object
+    properties:
+      core:
+        type: array
+        items: {type: string}
+      support:
+        type: array
+        items: {type: string}
+      watchdog: {type: string}
+      checker: {type: string}
+      internal-review-runner: {type: string}
+      milestone-notifier: {type: string}
+      issue-watcher-regex: {type: string}
 
   prompts:
     type: object

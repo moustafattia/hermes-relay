@@ -149,7 +149,7 @@ Recommended end-state:
 - plugin operator code should load plugin-local modules directly, not bounce through `scripts/...`
 
 Concrete Daedalus finding:
-- the clean YoYoPod Daedalus service unit should execute plugin runtime directly rather than `scripts/daedalus.py`
+- the clean Daedalus service unit should execute plugin runtime directly rather than `scripts/daedalus.py`
 - plugin alert logic should call plugin-local command execution, not try to import stale files like `daedalus_control.py`
 
 Migration order that worked:

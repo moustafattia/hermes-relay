@@ -12,7 +12,7 @@ Daedalus was previously known as **hermes-relay**. The rename introduced new sta
 | `relay.db` | `daedalus.db` |
 | `relay-events.jsonl` | `daedalus-events.jsonl` |
 | `relay-active@.service` | `daedalus-active@.service` |
-| `scripts/yoyopod_workflow.py` | `workflows/__main__.py` (plugin-owned) |
+| legacy workspace wrapper script | `workflows/__main__.py` (plugin-owned) |
 | `relay/` directory | `daedalus/` directory |
 | `watchdog` terminology | `engine` / `runtime` terminology |
 
@@ -38,11 +38,11 @@ It is **idempotent** — running it twice is safe.
 If the command is unavailable, the migration is a simple rename:
 
 ```bash
-mv ~/.hermes/workflows/yoyopod/state/relay/relay.db \
-   ~/.hermes/workflows/yoyopod/state/daedalus/daedalus.db
+mv ~/.hermes/workflows/<owner>-<repo>-<workflow-type>/state/relay/relay.db \
+   ~/.hermes/workflows/<owner>-<repo>-<workflow-type>/state/daedalus/daedalus.db
 
-mv ~/.hermes/workflows/yoyopod/memory/relay-events.jsonl \
-   ~/.hermes/workflows/yoyopod/memory/daedalus-events.jsonl
+mv ~/.hermes/workflows/<owner>-<repo>-<workflow-type>/memory/relay-events.jsonl \
+   ~/.hermes/workflows/<owner>-<repo>-<workflow-type>/memory/daedalus-events.jsonl
 ```
 
 ---
@@ -56,38 +56,39 @@ mv ~/.hermes/workflows/yoyopod/memory/relay-events.jsonl \
 ```
 
 This:
-1. Stops `relay-active@yoyopod.service`
+1. Stops `relay-active@<owner>-<repo>-<workflow-type>.service`
 2. Disables it
-3. Installs `daedalus-active@yoyopod.service`
+3. Installs `daedalus-active@<owner>-<repo>-<workflow-type>.service`
 4. Enables and starts it
 
 ### Manual fallback
 
 ```bash
 # Stop old
-systemctl --user stop relay-active@yoyopod.service
-systemctl --user disable relay-active@yoyopod.service
+systemctl --user stop relay-active@<owner>-<repo>-<workflow-type>.service
+systemctl --user disable relay-active@<owner>-<repo>-<workflow-type>.service
 
 # Install new
-python3 ~/.hermes/workflows/yoyopod/.hermes/plugins/daedalus/scripts/install.py
+cd <repo-root>
+./scripts/install.sh
 
 # Start new
-systemctl --user enable daedalus-active@yoyopod.service
-systemctl --user start daedalus-active@yoyopod.service
+systemctl --user enable daedalus-active@<owner>-<repo>-<workflow-type>.service
+systemctl --user start daedalus-active@<owner>-<repo>-<workflow-type>.service
 ```
 
 ---
 
 ## Config migration
 
-The workflow wrapper CLI moved from `scripts/yoyopod_workflow.py` to `workflows/__main__.py`. If you have cron jobs or aliases pointing at the old path, update them:
+The workflow CLI moved from a workflow-local wrapper script to `workflows/__main__.py`. If you have cron jobs or aliases pointing at the old path, update them:
 
 ```bash
 # Old (retired)
-python3 scripts/yoyopod_workflow.py status --json
+python3 <old-wrapper-script> status --json
 
 # New
-python3 -m workflows --workflow-root ~/.hermes/workflows/yoyopod status --json
+python3 -m workflows --workflow-root ~/.hermes/workflows/<owner>-<repo>-<workflow-type> status --json
 ```
 
 The `scripts/migrate_config.py` helper can rewrite paths in shell scripts and systemd units.

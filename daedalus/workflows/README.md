@@ -10,6 +10,13 @@ in `__init__.py` enforces a small contract: every workflow package must
 expose `NAME`, `SUPPORTED_SCHEMA_VERSIONS`, `CONFIG_SCHEMA_PATH`,
 `make_workspace(...)`, and `cli_main(workspace, argv)`.
 
+## Naming
+
+- Workflow type: external contract in `workflow.yaml`, always `lower-kebab-case` such as `code-review`.
+- Workflow package: Python slug under `workflows/`, always `lower_snake_case` such as `code_review/`.
+- Workflow instance root: directory under `~/.hermes/workflows/`, always `<owner>-<repo>-<workflow-type>`.
+- `instance.name` in `workflow.yaml` should match the workflow root directory name.
+
 ## Layout
 
 ```

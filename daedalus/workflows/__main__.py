@@ -11,14 +11,13 @@ script's containing directory (``.../workflows/``) instead of the plugin
 root, so ``from workflows import run_cli`` would fail. We compensate by
 inserting the plugin root onto sys.path before the import.
 
-If ``--workflow-root`` is omitted, the entrypoint honors these env vars
-(first match wins): ``DAEDALUS_WORKFLOW_ROOT``, ``YOYOPOD_WORKFLOW_ROOT``.
-If neither is set, ``~/.hermes/workflows/yoyopod`` is used as a last-resort
-default (matches the historical layout).
+If ``--workflow-root`` is omitted, the entrypoint delegates to the shared
+workflow-root resolver. That keeps ``DAEDALUS_WORKFLOW_ROOT`` as the canonical
+override and otherwise falls back to the installed/repo-local workflow layout
+without hardcoding a single project path.
 """
 from __future__ import annotations
 
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -33,11 +32,8 @@ if _PLUGIN_ROOT not in sys.path:
 from workflows import run_cli
 
 
-_WORKFLOW_ROOT_ENV_VARS = ("DAEDALUS_WORKFLOW_ROOT", "YOYOPOD_WORKFLOW_ROOT")
-
-
 def _resolve_workflow_root(argv: list[str]) -> tuple[Path, list[str]]:
-    """Peel --workflow-root / --workflow-root=<path> out of argv; env fallback."""
+    """Peel --workflow-root / --workflow-root=<path> out of argv; shared fallback."""
     out: list[str] = []
     workflow_root: Path | None = None
     i = 0
@@ -57,13 +53,11 @@ def _resolve_workflow_root(argv: list[str]) -> tuple[Path, list[str]]:
         i += 1
 
     if workflow_root is None:
-        for env_var in _WORKFLOW_ROOT_ENV_VARS:
-            value = os.environ.get(env_var)
-            if value:
-                workflow_root = Path(value).expanduser().resolve()
-                break
-    if workflow_root is None:
-        workflow_root = (Path.home() / ".hermes" / "workflows" / "yoyopod").resolve()
+        from workflows.code_review.paths import resolve_default_workflow_root
+
+        workflow_root = resolve_default_workflow_root(
+            plugin_dir=Path(__file__).resolve().parent.parent
+        )
     return workflow_root, out
 
 

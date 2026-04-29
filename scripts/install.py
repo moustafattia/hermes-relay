@@ -60,21 +60,17 @@ def resolve_destination(*, hermes_home: Path | None = None, destination: Path | 
 def _prepare_install_target(target: Path) -> Path:
     """Return the concrete directory to install into.
 
-    If ``target`` is a symlink (common setup: ``~/.hermes/plugins/daedalus``
-    pointing at a workflow-scoped plugin tree under
-    ``~/.hermes/workflows/<project>/.hermes/plugins/daedalus``), follow
-    the symlink and install into the real directory. The symlink itself is
-    preserved so callers that hard-code the symlink path keep working.
+    If ``target`` is a symlink, treat it as a retired legacy install layout:
+    remove the symlink and replace it with a real directory at the canonical
+    global plugin path.
 
     If ``target`` is a regular directory, wipe and recreate it. If it doesn't
     exist yet, create it (and its parents).
     """
     if target.is_symlink():
-        real_target = target.resolve()
-        if real_target.exists():
-            shutil.rmtree(real_target)
-        real_target.mkdir(parents=True, exist_ok=True)
-        return real_target
+        target.unlink()
+        target.mkdir(parents=True, exist_ok=True)
+        return target
     if target.exists():
         shutil.rmtree(target)
     target.mkdir(parents=True, exist_ok=True)

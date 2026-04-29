@@ -41,7 +41,7 @@ Pattern:
 
 Example:
 - `Daedalus`
-- `YoYoPod Daedalus`
+- `<ProjectName> Daedalus`
 
 ## Runtime mapping inside Hermes
 
@@ -52,10 +52,10 @@ Best fit:
 - have the CLI command launch/manage the long-running orchestrator service
 
 Current practical note:
-- on the Hermes build used during YoYoPod Daedalus bootstrap, generic plugin CLI registration is stored by the plugin manager, but the safest verified operator surface is still the slash-command path
+- on one Hermes build used during an early Daedalus bootstrap, generic plugin CLI registration was stored by the plugin manager, but the safest verified operator surface was still the slash-command path
 - treat slash commands as the reliable control surface unless you have explicitly verified that your target Hermes build exposes generic project-plugin CLI subcommands in `hermes <plugin> ...`
 - registering both is still worth doing so the plugin is forward-compatible when the CLI plumbing is present
-- concrete field finding: a project-local Daedalus plugin can exist under `.hermes/plugins/daedalus/` with `register_cli_command(...)` and still not show up in `hermes plugins list` or `hermes daedalus ...`; on the checked YoYoPod host, `hermes daedalus doctor ...` failed with `invalid choice: 'daedalus'` while the local plugin code and runtime worked fine
+- concrete field finding: a project-local Daedalus plugin can exist under `.hermes/plugins/daedalus/` with `register_cli_command(...)` and still not show up in `hermes plugins list` or `hermes daedalus ...`; on at least one checked host, `hermes daedalus doctor ...` failed with `invalid choice: 'daedalus'` while the local plugin code and runtime worked fine
 - practical consequence: do not assume operator docs can tell people to run `hermes daedalus ...` just because the plugin source exists; first verify the actual CLI surface on that host, and be ready to use the runtime script or in-session slash command instead
 - a good first real operator command is `shadow-report`: summarize runtime status, active lane, legacy next action, Daedalus-derived next action, compatibility, recent shadow actions, and runtime freshness in one shot
 - build `shadow-report` by reading the live legacy status, ingesting it into Daedalus canonical state, deriving the current shadow action without depending on a newly persisted row, and separately querying recent `lane_actions` for operator context
@@ -74,7 +74,7 @@ Current practical note:
 - a good failure slice after basic active execution is not another happy-path runner but structured failure handling: when an active action fails, mark the `lane_actions` row failed, insert a `failures` row, set lane `operator_attention_required`, update runtime `latest_error_*`, and emit `active_action_failed`, `failure_detected`, and `operator_attention_required` events
 - then teach `shadow-report` / `doctor` to surface unresolved active failures directly, or operators will have a "healthy" runtime that is silently dead in the only way that matters
 - the key verification is not just `runtime_status=running`; confirm the runtime owner and lease owner match, `latest_heartbeat_at` advances over time, and `expires_at` keeps moving forward. If those are not advancing, your daemon is fake and the operator report will drift back into stale-runtime lies
-- for supervised active cutover, operator tooling should also check service supervision separately from lease freshness: if the runtime owner is the active service profile, `shadow-report` / `doctor` should surface whether `daedalus-active@yoyopod.service` is installed, enabled, and actually active instead of pretending a stale or crashed service is covered by heartbeat checks alone
+- for supervised active cutover, operator tooling should also check service supervision separately from lease freshness: if the runtime owner is the active service profile, `shadow-report` / `doctor` should surface whether `daedalus-active@<workflow-name>.service` is installed, enabled, and actually active instead of pretending a stale or crashed service is covered by heartbeat checks alone
 - operator-facing status should also surface ownership posture directly, not force archaeology: include primary owner, whether Daedalus is primary, fallback watchdog mode, cutover gate allowance/reasons, and whether the supervised active service is healthy
 - for active-lane consistency checks, compare issue numbers extracted from multiple legacy surfaces instead of trusting one field: `activeLane.number`, `ledger.activeLane`, `nextAction.issueNumber`, implementation branch/worktree/session name, and open PR branch/title when available
 - surface split-brain risk even in shadow mode when the runtime still claims `running` without a valid lease; severity can stay lower than active-mode split-brain, but hiding it is stupid
@@ -387,7 +387,7 @@ Real implementation finding:
 - the first safe Daedalus slice is: validated backup -> frozen specs -> side-by-side runtime skeleton -> status command -> live legacy-state ingestion into canonical SQLite -> shadow action derivation/persistence -> legacy-vs-Daedalus comparison reporting
 - this order keeps the migration observable and reduces the chance of split-brain or invisible semantic drift
 
-Current proven implementation sequence from the YoYoPod Daedalus bootstrap work:
+Current proven implementation sequence from an early Daedalus bootstrap:
 1. create and validate a timestamped backup before touching runtime code; if the full tarball is too large/slow, create a slim but validated backup containing workflow config/docs/memory/scripts/tests/state/archive plus the active lane worktree snapshot
 2. implement a side-by-side Daedalus runtime script first (for example `scripts/daedalus.py`) instead of touching the legacy watchdog engine
 3. start with a minimal but real core: SQLite init, WAL pragmas, runtime lease acquisition, JSONL event append, and shadow-mode bootstrap
@@ -406,7 +406,7 @@ Practical lessons learned:
 - do not trust a huge timed-out tarball just because the file exists; validate with `gzip -t` and checksum or it is garbage
 - the active lane can move while architecture work is happening; Daedalus shadow ingestion must tolerate live drift and treat imported legacy state as observation, not authority over GitHub/worktree truth
 - if `sqlite3` CLI is unavailable on the host, Python-based verification plus tests are enough; do not block on missing shell conveniences
-- do not assume the legacy wrapper's managed jobs live only in `coreJobNames`; on the live YoYoPod config, `coreJobNames` can be empty while the real watchdog/telegram jobs are listed under `hermesJobNames`
+- do not assume the legacy wrapper's managed jobs live only in `coreJobNames`; on some live configs, `coreJobNames` can be empty while the real watchdog/notification jobs are listed under `hermesJobNames`
 - therefore wrapper pause/resume/status logic should operate on a managed-job union/fallback (`coreJobNames` + `hermesJobNames`) or Daedalus cutover gating will lie that the watchdog is still enabled even after a pause
 - when importing legacy review state, normalize it into stable internal/external reviewer rows immediately so Daedalus policy can remain role-based while still recording backend-specific fields like `claudeCode` and `codexCloud`
 - once active execution starts creating retry or recovery actions, `request_active_actions_for_lane()` must return already-requested active rows before deriving new ones, or queued retries become invisible and the loop falsely reports `no-active-actions`

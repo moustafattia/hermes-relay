@@ -22,7 +22,7 @@ def test_normalize_acpx_session_meta_maps_session_fields():
         {
             "name": "lane-224",
             "closed": False,
-            "cwd": "/tmp/yoyopod-issue-224",
+            "cwd": "/tmp/issue-224",
             "lastUsedAt": "2026-04-23T01:00:00Z",
             "acpSessionId": "session-123",
             "acpxRecordId": "record-123",
@@ -32,7 +32,7 @@ def test_normalize_acpx_session_meta_maps_session_fields():
     assert result == {
         "name": "lane-224",
         "closed": False,
-        "cwd": "/tmp/yoyopod-issue-224",
+        "cwd": "/tmp/issue-224",
         "last_used_at": "2026-04-23T01:00:00Z",
         "session_id": "session-123",
         "record_id": "record-123",
@@ -50,20 +50,20 @@ def test_show_acpx_session_returns_normalized_payload():
         return {
             "name": "lane-224",
             "closed": False,
-            "cwd": "/tmp/yoyopod-issue-224",
+            "cwd": "/tmp/issue-224",
             "last_used_at": "2026-04-23T01:00:00Z",
             "acpxSessionId": "session-123",
             "acpx_record_id": "record-123",
         }
 
     result = sessions_module.show_acpx_session(
-        worktree=Path('/tmp/yoyopod-issue-224'),
+        worktree=Path('/tmp/issue-224'),
         session_name='lane-224',
         run_json=fake_run_json,
     )
 
     assert result["session_id"] == "session-123"
-    assert seen["command"][:6] == ["acpx", "--format", "json", "--json-strict", "--cwd", "/tmp/yoyopod-issue-224"]
+    assert seen["command"][:6] == ["acpx", "--format", "json", "--json-strict", "--cwd", "/tmp/issue-224"]
 
 
 
@@ -76,13 +76,13 @@ def test_close_acpx_session_returns_true_when_runner_succeeds():
         seen["command"] = command
 
     result = sessions_module.close_acpx_session(
-        worktree=Path('/tmp/yoyopod-issue-224'),
+        worktree=Path('/tmp/issue-224'),
         session_name='lane-224',
         run=fake_run,
     )
 
     assert result is True
-    assert seen["command"] == ["acpx", "--cwd", "/tmp/yoyopod-issue-224", "codex", "sessions", "close", "lane-224"]
+    assert seen["command"] == ["acpx", "--cwd", "/tmp/issue-224", "codex", "sessions", "close", "lane-224"]
 
 
 
@@ -100,7 +100,7 @@ def test_ensure_acpx_session_retries_without_resume_when_resource_not_found():
         return {"acpxRecordId": "record-123"}
 
     result = sessions_module.ensure_acpx_session(
-        worktree=Path('/tmp/yoyopod-issue-224'),
+        worktree=Path('/tmp/issue-224'),
         session_name='lane-224',
         codex_model='gpt-5.3-codex',
         resume_session_id='missing-session',
@@ -126,7 +126,7 @@ def test_run_acpx_prompt_returns_stripped_stdout():
         return Completed()
 
     result = sessions_module.run_acpx_prompt(
-        worktree=Path('/tmp/yoyopod-issue-224'),
+        worktree=Path('/tmp/issue-224'),
         session_name='lane-224',
         prompt='hello',
         codex_model='gpt-5.3-codex',

@@ -20,7 +20,7 @@ def test_compute_health_ignores_core_job_missing_when_engine_owner_is_hermes():
     health = health_module.compute_health(
         engine_owner="hermes",
         active_lane_error=None,
-        missing_core_jobs=["yoyopod-workflow-milestone-telegram"],
+        missing_core_jobs=["workflow-milestone-notifier"],
         disabled_core_jobs=[],
         stale_core_jobs=[],
         drift=[],

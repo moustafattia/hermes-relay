@@ -245,7 +245,7 @@ def format_status(
     lane_count = result.get("lane_count")
     lanes_str = str(lane_count) if lane_count is not None else EMPTY_VALUE
 
-    instance_label = result.get("instance_id") or result.get("workflow_root_name") or "yoyopod"
+    instance_label = result.get("instance_id") or result.get("workflow_root_name") or "workflow"
 
     # Build sections
     top_rows = [

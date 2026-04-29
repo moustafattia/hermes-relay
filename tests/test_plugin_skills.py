@@ -1,4 +1,4 @@
-"""Structural tests for the plugin-owned ``skills/`` payload.
+"""Structural tests for the plugin-owned generic ``skills/`` payload.
 
 Skills live under ``~/WS/daedalus/skills/<skill-name>/SKILL.md``.
 The installer copies this tree to ``~/.hermes/plugins/daedalus/skills/``
@@ -11,7 +11,7 @@ These tests pin:
 - every ``SKILL.md`` starts with a YAML frontmatter block declaring at
   least ``name`` and ``description``
 - the frontmatter ``name`` matches the directory name
-- the set of skills includes the expected YoYoPod + Daedalus surface
+- the set of skills includes the expected generic Daedalus surface
 """
 import re
 from pathlib import Path
@@ -23,13 +23,7 @@ SKILLS_DIR = REPO_ROOT / "skills"
 
 EXPECTED_SKILLS = {
     "operator",
-    "yoyopod-lane-automation",
-    "yoyopod-workflow-watchdog-tick",
-    "yoyopod-closeout-notifier",
-    "yoyopod-daedalus-alerts-monitoring",
-    "yoyopod-daedalus-outage-alerts",
     "daedalus-architecture",
-    "daedalus-model1-project-layout",
     "hermes-plugin-cli-wiring",
     "daedalus-hardening-slices",
     "daedalus-retire-watchdog-and-migrate-control-schema",
@@ -97,7 +91,7 @@ def test_skills_readme_exists_and_lists_each_skill():
 
 
 def test_no_skills_reference_retired_wrapper_script():
-    """The workspace-side `scripts/yoyopod_workflow.py` wrapper has been retired.
+    """Retired workspace wrapper scripts should not appear in root skills.
 
     Skill commands should invoke the plugin entrypoint, not the wrapper.
     """
@@ -107,11 +101,10 @@ def test_no_skills_reference_retired_wrapper_script():
         for i, line in enumerate(skill_md.read_text(encoding="utf-8").splitlines(), start=1):
             # Only flag actionable command lines, not narrative history.
             stripped = line.strip().lstrip("`").lstrip()
-            if stripped.startswith("python3 ") and "scripts/yoyopod_workflow.py" in stripped:
+            if stripped.startswith("python3 ") and "/scripts/" in stripped:
                 offenders.append((f"{skill_dir.name}/SKILL.md:{i}", line.strip()))
     assert not offenders, (
-        "skills still contain actionable `python3 .../scripts/yoyopod_workflow.py` commands. "
-        "These must use the plugin entrypoint "
-        "`python3 .../adapters/yoyopod_core/__main__.py` instead. Offenders: "
+        "root skills still contain actionable `python3 .../scripts/...` commands. "
+        "These must use plugin entrypoints or slash commands instead. Offenders: "
         f"{offenders}"
     )

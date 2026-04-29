@@ -115,7 +115,7 @@ def collect_broken_watchers(
     return broken
 
 
-"""YoYoPod Core health and drift helpers.
+"""Code-review workflow health and drift helpers.
 
 This module is the first real extraction from the legacy wrapper read-model. It
 owns the top-level health classification rules so Relay-side consumers can stop

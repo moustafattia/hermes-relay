@@ -18,7 +18,7 @@ def _minimal_valid_config():
     return {
         "workflow": "code-review",
         "schema-version": 1,
-        "instance": {"name": "yoyopod", "engine-owner": "hermes"},
+        "instance": {"name": "owner-repo-code-review", "engine-owner": "hermes"},
         "repository": {
             "local-path": "/tmp/repo",
             "github-slug": "owner/repo",

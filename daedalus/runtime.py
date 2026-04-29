@@ -10,9 +10,9 @@ from typing import Any
 
 from workflows.code_review.paths import (
     plugin_entrypoint_path,
+    project_key_for_workflow_root,
     runtime_paths,
-    runtime_paths as yoyopod_runtime_paths,
-    yoyopod_cli_argv,
+    workflow_cli_argv,
 )
 from workflows.code_review.event_taxonomy import (
     DAEDALUS_ACTIVE_ACTION_COMPLETED,
@@ -30,7 +30,7 @@ from workflows.code_review.event_taxonomy import (
     DAEDALUS_SHADOW_ACTION_REQUESTED,
     canonicalize as canonicalize_event_type,
 )
-from workflows.code_review.status import build_status as build_yoyopod_core_status
+from workflows.code_review.status import build_status as build_workflow_status
 import sys
 
 def _load_migration_module():
@@ -697,7 +697,25 @@ def release_lease(
 
 
 def _runtime_paths(workflow_root: Path) -> dict[str, Path]:
-    return yoyopod_runtime_paths(workflow_root)
+    return runtime_paths(workflow_root)
+
+
+def _project_key_for(workflow_root: Path) -> str:
+    paths = _runtime_paths(workflow_root)
+    db_path = paths["db_path"]
+    if db_path.exists():
+        conn = _connect(db_path)
+        try:
+            row = conn.execute(
+                "SELECT project_key FROM daedalus_runtime WHERE runtime_id='daedalus'"
+            ).fetchone()
+        except sqlite3.Error:
+            row = None
+        finally:
+            conn.close()
+        if row and row[0]:
+            return str(row[0])
+    return project_key_for_workflow_root(workflow_root)
 
 
 def _default_execution_control(*, now_iso: str | None = None) -> dict[str, Any]:
@@ -711,7 +729,7 @@ def _default_execution_control(*, now_iso: str | None = None) -> dict[str, Any]:
 
 def get_execution_control(*, workflow_root: Path) -> dict[str, Any]:
     paths = _runtime_paths(workflow_root)
-    init_daedalus_db(workflow_root=workflow_root, project_key="yoyopod")
+    init_daedalus_db(workflow_root=workflow_root, project_key=_project_key_for(workflow_root))
     conn = _connect(paths["db_path"])
     try:
         row = conn.execute(
@@ -740,7 +758,7 @@ def set_execution_control(
     now_iso = now_iso or _now_iso()
     metadata = metadata or {}
     paths = _runtime_paths(workflow_root)
-    init_daedalus_db(workflow_root=workflow_root, project_key="yoyopod")
+    init_daedalus_db(workflow_root=workflow_root, project_key=_project_key_for(workflow_root))
     conn = _connect(paths["db_path"])
     try:
         conn.execute(
@@ -771,7 +789,7 @@ def set_execution_control(
             "event_version": 1,
             "created_at": now_iso,
             "producer": "Workflow_Orchestrator",
-            "project_key": "yoyopod",
+            "project_key": _project_key_for(workflow_root),
             "lane_id": None,
             "issue_number": None,
             "head_sha": None,
@@ -1154,7 +1172,7 @@ def ingest_legacy_status(*, workflow_root: Path, legacy_status: dict[str, Any], 
             "event_version": 1,
             "created_at": now_iso,
             "producer": "Legacy_Watchdog_Shadow",
-            "project_key": "yoyopod",
+            "project_key": _project_key_for(workflow_root),
             "lane_id": lane_id,
             "issue_number": issue_number,
             "head_sha": impl.get("localHeadSha"),
@@ -1383,7 +1401,7 @@ def persist_shadow_actions(*, workflow_root: Path, lane_id: str, now_iso: str | 
                     "event_version": 1,
                     "created_at": now_iso,
                     "producer": "Workflow_Orchestrator",
-                    "project_key": "yoyopod",
+                    "project_key": _project_key_for(workflow_root),
                     "lane_id": lane_id,
                     "issue_number": lane.get("issue_number"),
                     "head_sha": action.get("target_head_sha"),
@@ -1517,7 +1535,7 @@ def request_active_actions_for_lane(*, workflow_root: Path, lane_id: str, now_is
                     "event_version": 1,
                     "created_at": now_iso,
                     "producer": "Workflow_Orchestrator",
-                    "project_key": "yoyopod",
+                    "project_key": _project_key_for(workflow_root),
                     "lane_id": lane_id,
                     "issue_number": lane.get("issue_number"),
                     "head_sha": action.get("target_head_sha"),
@@ -1549,9 +1567,9 @@ def request_active_actions_for_lane(*, workflow_root: Path, lane_id: str, now_is
     return persisted
 
 
-def _run_yoyopod_cli_json(*, workflow_root: Path, command: str) -> dict[str, Any]:
-    """Spawn the YoYoPod CLI (plugin entrypoint preferred, wrapper fallback) and parse JSON output."""
-    argv = yoyopod_cli_argv(workflow_root, command, "--json")
+def _run_workflow_cli_json(*, workflow_root: Path, command: str) -> dict[str, Any]:
+    """Spawn the workflow CLI via the plugin entrypoint and parse JSON output."""
+    argv = workflow_cli_argv(workflow_root, command, "--json")
     completed = subprocess.run(
         argv,
         capture_output=True,
@@ -1569,31 +1587,31 @@ def _run_yoyopod_cli_json(*, workflow_root: Path, command: str) -> dict[str, Any
 
 
 def _run_legacy_dispatch_implementation_turn(*, workflow_root: Path) -> dict[str, Any]:
-    return _run_yoyopod_cli_json(workflow_root=workflow_root, command="dispatch-implementation-turn")
+    return _run_workflow_cli_json(workflow_root=workflow_root, command="dispatch-implementation-turn")
 
 
 def _run_legacy_push_pr_update(*, workflow_root: Path) -> dict[str, Any]:
-    return _run_yoyopod_cli_json(workflow_root=workflow_root, command="push-pr-update")
+    return _run_workflow_cli_json(workflow_root=workflow_root, command="push-pr-update")
 
 
 def _run_legacy_publish_pr(*, workflow_root: Path) -> dict[str, Any]:
-    return _run_yoyopod_cli_json(workflow_root=workflow_root, command="publish-ready-pr")
+    return _run_workflow_cli_json(workflow_root=workflow_root, command="publish-ready-pr")
 
 
 def _run_legacy_request_internal_review(*, workflow_root: Path) -> dict[str, Any]:
-    return _run_yoyopod_cli_json(workflow_root=workflow_root, command="dispatch-claude-review")
+    return _run_workflow_cli_json(workflow_root=workflow_root, command="dispatch-claude-review")
 
 
 def _run_legacy_merge_pr(*, workflow_root: Path) -> dict[str, Any]:
-    return _run_yoyopod_cli_json(workflow_root=workflow_root, command="merge-and-promote")
+    return _run_workflow_cli_json(workflow_root=workflow_root, command="merge-and-promote")
 
 
 def _run_legacy_dispatch_repair_handoff(*, workflow_root: Path) -> dict[str, Any]:
-    return _run_yoyopod_cli_json(workflow_root=workflow_root, command="dispatch-repair-handoff")
+    return _run_workflow_cli_json(workflow_root=workflow_root, command="dispatch-repair-handoff")
 
 
 def _run_legacy_restart_actor_session(*, workflow_root: Path) -> dict[str, Any]:
-    return _run_yoyopod_cli_json(workflow_root=workflow_root, command="restart-actor-session")
+    return _run_workflow_cli_json(workflow_root=workflow_root, command="restart-actor-session")
 
 
 def _default_active_action_runners(*, workflow_root: Path) -> dict[str, Any]:
@@ -1937,7 +1955,7 @@ def reap_stuck_dispatched_actions(*, workflow_root: Path, lane_id: str, now_iso:
                         "event_version": 1,
                         "created_at": now_iso,
                         "producer": "Workflow_Orchestrator",
-                        "project_key": "yoyopod",
+                        "project_key": _project_key_for(workflow_root),
                         "lane_id": action.get("lane_id"),
                         "issue_number": None,
                         "head_sha": action.get("target_head_sha"),
@@ -1971,7 +1989,7 @@ def reap_stuck_dispatched_actions(*, workflow_root: Path, lane_id: str, now_iso:
                         "event_version": 1,
                         "created_at": now_iso,
                         "producer": "Workflow_Orchestrator",
-                        "project_key": "yoyopod",
+                        "project_key": _project_key_for(workflow_root),
                         "lane_id": action.get("lane_id"),
                         "issue_number": None,
                         "head_sha": action.get("target_head_sha"),
@@ -1992,7 +2010,7 @@ def reap_stuck_dispatched_actions(*, workflow_root: Path, lane_id: str, now_iso:
                     "event_version": 1,
                     "created_at": now_iso,
                     "producer": "Workflow_Orchestrator",
-                    "project_key": "yoyopod",
+                    "project_key": _project_key_for(workflow_root),
                     "lane_id": action.get("lane_id"),
                     "issue_number": None,
                     "head_sha": action.get("target_head_sha"),
@@ -2074,7 +2092,7 @@ def _make_relay_event(
         "event_version": 1,
         "created_at": now_iso,
         "producer": "Workflow_Orchestrator",
-        "project_key": "yoyopod",
+        "project_key": _project_key_for(workflow_root),
         "lane_id": lane_id,
         "issue_number": issue_number,
         "head_sha": head_sha,
@@ -2784,7 +2802,7 @@ def _analyze_ambiguous_failure(
             "event_version": 1,
             "created_at": now_iso,
             "producer": "Workflow_Orchestrator",
-            "project_key": "yoyopod",
+            "project_key": _project_key_for(workflow_root),
             "lane_id": action.get("lane_id"),
             "issue_number": None,
             "head_sha": action.get("target_head_sha"),
@@ -2830,7 +2848,7 @@ def _analyze_ambiguous_failure(
             "event_version": 1,
             "created_at": now_iso,
             "producer": "Workflow_Orchestrator",
-            "project_key": "yoyopod",
+            "project_key": _project_key_for(workflow_root),
             "lane_id": action.get("lane_id"),
             "issue_number": None,
             "head_sha": action.get("target_head_sha"),
@@ -3165,7 +3183,7 @@ def execute_requested_action(
                 "event_version": 1,
                 "created_at": now_iso,
                 "producer": "Workflow_Orchestrator",
-                "project_key": "yoyopod",
+                "project_key": _project_key_for(workflow_root),
                 "lane_id": (action or {}).get("lane_id"),
                 "issue_number": None,
                 "head_sha": (action or {}).get("target_head_sha"),
@@ -3183,7 +3201,7 @@ def execute_requested_action(
                 "event_version": 1,
                 "created_at": now_iso,
                 "producer": "Workflow_Orchestrator",
-                "project_key": "yoyopod",
+                "project_key": _project_key_for(workflow_root),
                 "lane_id": (action or {}).get("lane_id"),
                 "issue_number": None,
                 "head_sha": (action or {}).get("target_head_sha"),
@@ -3218,7 +3236,7 @@ def execute_requested_action(
                     "event_version": 1,
                     "created_at": now_iso,
                     "producer": "Workflow_Orchestrator",
-                    "project_key": "yoyopod",
+                    "project_key": _project_key_for(workflow_root),
                     "lane_id": recovery_action.get("lane_id"),
                     "issue_number": None,
                     "head_sha": recovery_action.get("target_head_sha"),
@@ -3242,7 +3260,7 @@ def execute_requested_action(
                     "event_version": 1,
                     "created_at": now_iso,
                     "producer": "Workflow_Orchestrator",
-                    "project_key": "yoyopod",
+                    "project_key": _project_key_for(workflow_root),
                     "lane_id": action.get("lane_id"),
                     "issue_number": None,
                     "head_sha": action.get("target_head_sha"),
@@ -3267,7 +3285,7 @@ def execute_requested_action(
             "event_version": 1,
             "created_at": now_iso,
             "producer": "Workflow_Orchestrator",
-            "project_key": "yoyopod",
+            "project_key": _project_key_for(workflow_root),
             "lane_id": action.get("lane_id"),
             "issue_number": None,
             "head_sha": action.get("target_head_sha"),
@@ -3352,7 +3370,7 @@ def refresh_runtime_lease(*, workflow_root: Path, instance_id: str, now_iso: str
             "event_version": 1,
             "created_at": now_iso,
             "producer": "Daedalus_Runtime",
-            "project_key": "yoyopod",
+            "project_key": _project_key_for(workflow_root),
             "lane_id": None,
             "issue_number": None,
             "head_sha": None,
@@ -3438,7 +3456,7 @@ def reconcile_stalled_recoveries(*, workflow_root: Path, lane_id: str, now_iso: 
                         "event_version": 1,
                         "created_at": now_iso,
                         "producer": "Workflow_Orchestrator",
-                        "project_key": "yoyopod",
+                        "project_key": _project_key_for(workflow_root),
                         "lane_id": lane_id,
                         "issue_number": failure.get("issue_number"),
                         "head_sha": failure.get("evidence", {}).get("target_head_sha"),
@@ -3686,21 +3704,18 @@ def run_active_loop(
 def _load_legacy_workflow_module(workflow_root: Path):
     """Build the plugin's workspace accessor for the given workflow root.
 
-    Returns an object that exposes the full YoYoPod workflow attribute
+    Returns an object that exposes the full workflow attribute
     surface (``build_status``, ``reconcile``, ``doctor``, ``dispatch_*``,
-    config constants, helper methods). Historically this function used to
-    prefer a workspace-scoped ``yoyopod_workflow.py`` wrapper script; that
-    wrapper has been retired, so the only supported resolution is via
+    config constants, helper methods). The supported resolution is via
     ``workflows.code_review.workspace.load_workspace_from_config``.
     """
-    plugin_main = plugin_entrypoint_path(workflow_root)
+    plugin_root = Path(__file__).resolve().parent
+    plugin_main = plugin_root / "workflows" / "__main__.py"
     if not plugin_main.exists():
         raise RuntimeError(
-            f"daedalus plugin not installed under {workflow_root}; "
-            f"expected entrypoint at {plugin_main}. Run ./scripts/install.sh "
-            "from the daedalus repo to install it."
+            f"daedalus plugin entrypoint not found at {plugin_main}. "
+            "Run ./scripts/install.sh from the daedalus repo to install it."
         )
-    plugin_root = plugin_main.parents[2]
     if str(plugin_root) not in sys.path:
         sys.path.insert(0, str(plugin_root))
     workspace_mod = importlib.import_module("workflows.code_review.workspace")
@@ -3708,7 +3723,7 @@ def _load_legacy_workflow_module(workflow_root: Path):
 
 
 def ingest_live_legacy_status(*, workflow_root: Path, now_iso: str | None = None) -> dict[str, Any]:
-    legacy_status = build_yoyopod_core_status(workflow_root)
+    legacy_status = build_workflow_status(workflow_root)
     return ingest_legacy_status(workflow_root=workflow_root, legacy_status=legacy_status, now_iso=now_iso)
 
 
@@ -3716,27 +3731,27 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Daedalus side-by-side runtime bootstrap.")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    init_cmd = sub.add_parser("init", help="Initialize Relay DB and filesystem paths.")
+    init_cmd = sub.add_parser("init", help="Initialize Daedalus DB and filesystem paths.")
     init_cmd.add_argument("--workflow-root", required=True)
-    init_cmd.add_argument("--project-key", default="yoyopod")
+    init_cmd.add_argument("--project-key")
     init_cmd.add_argument("--json", action="store_true")
 
-    start_cmd = sub.add_parser("start", help="Bootstrap Relay runtime and acquire runtime lease.")
+    start_cmd = sub.add_parser("start", help="Bootstrap Daedalus runtime and acquire runtime lease.")
     start_cmd.add_argument("--workflow-root", required=True)
-    start_cmd.add_argument("--project-key", default="yoyopod")
+    start_cmd.add_argument("--project-key")
     start_cmd.add_argument("--instance-id", required=True)
     start_cmd.add_argument("--mode", default="shadow", choices=["shadow", "active", "maintenance"])
     start_cmd.add_argument("--json", action="store_true")
 
-    status_cmd = sub.add_parser("status", help="Show Relay runtime status.")
+    status_cmd = sub.add_parser("status", help="Show Daedalus runtime status.")
     status_cmd.add_argument("--workflow-root", required=True)
     status_cmd.add_argument("--json", action="store_true")
 
-    ingest_cmd = sub.add_parser("ingest-live", help="Ingest current legacy YoYoPod workflow status into Relay shadow state.")
+    ingest_cmd = sub.add_parser("ingest-live", help="Ingest current workflow status into Daedalus shadow state.")
     ingest_cmd.add_argument("--workflow-root", required=True)
     ingest_cmd.add_argument("--json", action="store_true")
 
-    heartbeat_cmd = sub.add_parser("heartbeat", help="Refresh Relay runtime lease and heartbeat timestamp.")
+    heartbeat_cmd = sub.add_parser("heartbeat", help="Refresh Daedalus runtime lease and heartbeat timestamp.")
     heartbeat_cmd.add_argument("--workflow-root", required=True)
     heartbeat_cmd.add_argument("--instance-id", required=True)
     heartbeat_cmd.add_argument("--ttl-seconds", type=int, default=60)
@@ -3749,17 +3764,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     run_cmd = sub.add_parser("run-shadow", help="Run the shadow-mode loop shell for one or more iterations.")
     run_cmd.add_argument("--workflow-root", required=True)
-    run_cmd.add_argument("--project-key", default="yoyopod")
+    run_cmd.add_argument("--project-key")
     run_cmd.add_argument("--instance-id", required=True)
     run_cmd.add_argument("--interval-seconds", type=int, default=30)
     run_cmd.add_argument("--max-iterations", type=int)
     run_cmd.add_argument("--json", action="store_true")
 
-    active_gate_status_cmd = sub.add_parser("active-gate-status", help="Show Relay active-execution gate state.")
+    active_gate_status_cmd = sub.add_parser("active-gate-status", help="Show Daedalus active-execution gate state.")
     active_gate_status_cmd.add_argument("--workflow-root", required=True)
     active_gate_status_cmd.add_argument("--json", action="store_true")
 
-    set_active_execution_cmd = sub.add_parser("set-active-execution", help="Enable or disable Relay active execution.")
+    set_active_execution_cmd = sub.add_parser("set-active-execution", help="Enable or disable Daedalus active execution.")
     set_active_execution_cmd.add_argument("--workflow-root", required=True)
     set_active_execution_cmd.add_argument("--enabled", choices=["true", "false"], required=True)
     set_active_execution_cmd.add_argument("--json", action="store_true")
@@ -3771,7 +3786,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     run_active_cmd = sub.add_parser("run-active", help="Run the guarded active-mode loop shell for one or more iterations.")
     run_active_cmd.add_argument("--workflow-root", required=True)
-    run_active_cmd.add_argument("--project-key", default="yoyopod")
+    run_active_cmd.add_argument("--project-key")
     run_active_cmd.add_argument("--instance-id", required=True)
     run_active_cmd.add_argument("--interval-seconds", type=int, default=30)
     run_active_cmd.add_argument("--max-iterations", type=int)
@@ -3800,14 +3815,15 @@ def main() -> int:
     args = parser.parse_args()
     workflow_root = Path(args.workflow_root)
     paths = _runtime_paths(workflow_root)
+    project_key = _project_key_for(workflow_root) if getattr(args, "project_key", None) is None else args.project_key
     if args.command == "init":
-        result = init_daedalus_db(workflow_root=workflow_root, project_key=args.project_key)
+        result = init_daedalus_db(workflow_root=workflow_root, project_key=project_key)
         print(json.dumps(result, indent=2) if args.json else f"initialized {result['db_path']}")
         return 0
     if args.command == "start":
         result = bootstrap_runtime(
             workflow_root=workflow_root,
-            project_key=args.project_key,
+            project_key=project_key,
             instance_id=args.instance_id,
             mode=args.mode,
         )
@@ -3839,7 +3855,7 @@ def main() -> int:
     if args.command == "run-shadow":
         result = run_shadow_loop(
             workflow_root=workflow_root,
-            project_key=args.project_key,
+            project_key=project_key,
             instance_id=args.instance_id,
             interval_seconds=args.interval_seconds,
             max_iterations=args.max_iterations,
@@ -3867,7 +3883,7 @@ def main() -> int:
     if args.command == "run-active":
         result = run_active_loop(
             workflow_root=workflow_root,
-            project_key=args.project_key,
+            project_key=project_key,
             instance_id=args.instance_id,
             interval_seconds=args.interval_seconds,
             max_iterations=args.max_iterations,

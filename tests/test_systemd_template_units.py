@@ -42,7 +42,7 @@ def test_template_unit_filename():
 
 def test_instance_unit_name():
     tools = load_tools()
-    assert tools._instance_unit_name("active", "yoyopod") == "daedalus-active@yoyopod.service"
+    assert tools._instance_unit_name("active", "workflow") == "daedalus-active@workflow.service"
     assert tools._instance_unit_name("shadow", "blueprint") == "daedalus-shadow@blueprint.service"
 
 
@@ -79,8 +79,8 @@ def test_migrate_systemd_removes_old_unit_files_when_present(tmp_path, monkeypat
     workflow_root.mkdir()
 
     # Seed old unit files
-    (tmp_path / "yoyopod-relay-active.service").write_text("[Unit]\nDescription=old\n")
-    (tmp_path / "yoyopod-relay-shadow.service").write_text("[Unit]\nDescription=old\n")
+    (tmp_path / "wsroot-relay-active.service").write_text("[Unit]\nDescription=old\n")
+    (tmp_path / "wsroot-relay-shadow.service").write_text("[Unit]\nDescription=old\n")
 
     captured_cmds = []
     def fake_run(cmd, **kwargs):
@@ -93,8 +93,8 @@ def test_migrate_systemd_removes_old_unit_files_when_present(tmp_path, monkeypat
     )
 
     # Old unit files removed
-    assert not (tmp_path / "yoyopod-relay-active.service").exists()
-    assert not (tmp_path / "yoyopod-relay-shadow.service").exists()
+    assert not (tmp_path / "wsroot-relay-active.service").exists()
+    assert not (tmp_path / "wsroot-relay-shadow.service").exists()
     # New template units installed
     assert (tmp_path / "daedalus-active@.service").exists()
     assert (tmp_path / "daedalus-shadow@.service").exists()

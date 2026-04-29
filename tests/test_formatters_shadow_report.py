@@ -20,7 +20,7 @@ def _fmt():
 def _example_shadow_report():
     return {
         "runtime": {"runtime_status": "running", "current_mode": "active",
-                    "active_orchestrator_instance_id": "daedalus-active-yoyopod",
+                    "active_orchestrator_instance_id": "daedalus-active-workflow-example",
                     "latest_heartbeat_at": "2026-04-26T22:43:01Z"},
         "heartbeat": {"heartbeat_age_seconds": 17, "expires_at": "2026-04-26T22:44:00Z"},
         "service": {"service_mode": "active", "installed": True, "enabled": True, "active": True},

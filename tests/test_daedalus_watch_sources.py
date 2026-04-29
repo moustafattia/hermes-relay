@@ -23,7 +23,7 @@ def _module():
 
 def _make_workflow_root(tmp_path):
     """Build a workflow_root tree that runtime_paths recognizes (has runtime/, config/)."""
-    root = tmp_path / "yoyopod_core"
+    root = tmp_path / "workflow_example"
     (root / "runtime" / "memory").mkdir(parents=True)
     (root / "runtime" / "state" / "daedalus").mkdir(parents=True)
     (root / "config").mkdir()
@@ -88,7 +88,7 @@ def test_active_lanes_returns_empty_when_query_fails():
     import tempfile
     sources = _module()
     with tempfile.TemporaryDirectory() as td:
-        root = Path(td) / "yoyopod_core"
+        root = Path(td) / "workflow_example"
         (root / "runtime" / "state" / "daedalus").mkdir(parents=True)
         (root / "config").mkdir()
         (root / "workspace").mkdir()

@@ -11,7 +11,7 @@ def _load_template(name: str) -> str:
     return (_PROMPT_BUNDLE / f"{name}.md").read_text(encoding="utf-8")
 
 
-"""YoYoPod Core prompt rendering helpers.
+"""Workflow prompt rendering helpers.
 
 This slice extracts deterministic prompt construction from the legacy wrapper so
 workflow execution can compose adapter-owned prompt logic without keeping all

@@ -248,7 +248,7 @@ def test_main_uses_env_fallback_when_no_workflow_root_flag(tmp_path, monkeypatch
         encoding="utf-8",
     )
     _reset_workflows_module_cache()
-    monkeypatch.setenv("YOYOPOD_WORKFLOW_ROOT", str(workspace_root))
+    monkeypatch.setenv("DAEDALUS_WORKFLOW_ROOT", str(workspace_root))
     workflows = importlib.import_module("workflows")
     monkeypatch.setattr(workflows, "__path__", list(workflows.__path__) + [str(tmp_path / "workflows")])
 

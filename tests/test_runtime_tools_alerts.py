@@ -71,7 +71,7 @@ def test_init_daedalus_db_migrates_execution_control_to_clean_schema(runtime_mod
     finally:
         conn.close()
 
-    runtime_module.init_daedalus_db(workflow_root=workflow_root, project_key="yoyopod")
+    runtime_module.init_daedalus_db(workflow_root=workflow_root, project_key="workflow-example")
 
     db_path = runtime_module._runtime_paths(workflow_root)["db_path"]
     conn = sqlite3.connect(db_path)
@@ -103,13 +103,13 @@ def test_init_daedalus_db_migrates_execution_control_to_clean_schema(runtime_mod
 def test_ingest_legacy_status_preserves_active_action_operator_attention(runtime_module, tmp_path):
     workflow_root = tmp_path / "workflow"
     paths = runtime_module._runtime_paths(workflow_root)
-    runtime_module.init_daedalus_db(workflow_root=workflow_root, project_key="yoyopod")
+    runtime_module.init_daedalus_db(workflow_root=workflow_root, project_key="workflow-example")
 
     legacy_status = {
         "activeLane": {"number": 221, "url": "https://example.com/issues/221", "title": "Issue 221", "labels": []},
         "repo": "/tmp/repo",
         "implementation": {
-            "worktree": "/tmp/yoyopod-issue-221",
+            "worktree": "/tmp/issue-221",
             "branch": "codex/issue-221-test",
             "localHeadSha": "abc123",
             "laneState": {
@@ -163,7 +163,7 @@ def test_ingest_legacy_status_preserves_active_action_operator_attention(runtime
 def test_request_active_actions_event_payload_uses_retry_count(runtime_module, tmp_path, monkeypatch):
     workflow_root = tmp_path / "workflow"
     paths = runtime_module._runtime_paths(workflow_root)
-    runtime_module.init_daedalus_db(workflow_root=workflow_root, project_key="yoyopod")
+    runtime_module.init_daedalus_db(workflow_root=workflow_root, project_key="workflow-example")
 
     now_iso = "2026-04-22T00:00:00Z"
     conn = runtime_module._connect(paths["db_path"])
@@ -244,7 +244,7 @@ def test_request_active_actions_event_payload_uses_retry_count(runtime_module, t
 def test_reap_stuck_dispatched_actions_marks_dispatcher_lost_and_queues_recovery(runtime_module, tmp_path):
     workflow_root = tmp_path / "workflow"
     paths = runtime_module._runtime_paths(workflow_root)
-    runtime_module.init_daedalus_db(workflow_root=workflow_root, project_key="yoyopod")
+    runtime_module.init_daedalus_db(workflow_root=workflow_root, project_key="workflow-example")
 
     now_iso = "2026-04-22T01:00:00Z"
     conn = runtime_module._connect(paths["db_path"])
@@ -371,7 +371,7 @@ def test_doctor_reports_stuck_dispatched_actions(tools_module, monkeypatch):
             "relay": {"compatible": True, "derived_action_type": "dispatch_repair_handoff", "reason": "ok"},
             "recent_failures": [],
             "active_failure_summary": {},
-            "service": {"service_name": "daedalus-active@yoyopod.service", "installed": True, "enabled": True, "active": True},
+            "service": {"service_name": "daedalus-active@workflow-example.service", "installed": True, "enabled": True, "active": True},
             "service_health": {"expected_service_mode": None, "healthy": True, "reasons": []},
             "owner_summary": {"primary_owner": "relay", "gate_allowed": True},
             "recent_shadow_actions": [],
@@ -391,7 +391,7 @@ def test_doctor_reports_stuck_dispatched_actions(tools_module, monkeypatch):
             DISPATCHED_ACTION_TIMEOUT_SECONDS=relay_stub.DISPATCHED_ACTION_TIMEOUT_SECONDS,
         ),
     )
-    # _build_project_status calls build_yoyopod_core_status directly (which
+    # _build_project_status calls build_workflow_example_status directly (which
     # reads config/workflow.yaml from disk), bypassing the _load_daedalus_module
     # mock above. Stub it so the test stays a unit test of doctor-report logic
     # rather than incidentally requiring a YAML workspace fixture.
@@ -496,11 +496,16 @@ def test_execute_raw_args_catches_unexpected_exception(tools_module, monkeypatch
 
 
 def test_install_supervised_service_requires_plugin_runtime(tools_module, tmp_path):
-    with pytest.raises(tools_module.DaedalusCommandError, match="Daedalus plugin runtime not found"):
-        tools_module.install_supervised_service(
-            workflow_root=tmp_path,
-            project_key="yoyopod",
-            instance_id="relay-test",
-            interval_seconds=30,
-            service_mode="shadow",
-        )
+    original = tools_module._expected_plugin_runtime_path
+    tools_module._expected_plugin_runtime_path = lambda _workflow_root: tmp_path / "missing-runtime.py"
+    try:
+        with pytest.raises(tools_module.DaedalusCommandError, match="Daedalus plugin runtime not found"):
+            tools_module.install_supervised_service(
+                workflow_root=tmp_path,
+                project_key="workflow-example",
+                instance_id="relay-test",
+                interval_seconds=30,
+                service_mode="shadow",
+            )
+    finally:
+        tools_module._expected_plugin_runtime_path = original

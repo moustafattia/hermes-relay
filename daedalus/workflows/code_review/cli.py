@@ -7,18 +7,15 @@ from pathlib import Path
 from typing import Any
 
 
-"""YoYoPod Core command-line interface.
+"""Code-review workflow command-line interface.
 
 This module owns the argparse surface and the ``main`` dispatcher that the
-retired wrapper (``scripts/yoyopod_workflow.py``) used to host directly. The
-wrapper now constructs a "workspace" accessor (the legacy wrapper module
-itself, which still owns the workspace-scoped config / primitives) and
-delegates to :func:`main` here.
+workflow workspace accessor delegates into directly.
 
 Each subcommand is dispatched against the workspace accessor so the adapter
-CLI does not take on a direct dependency on the wrapper's module-level
-globals; instead it reads them through the accessor. The accessor contract
-is simply "exposes the wrapper's public entrypoints": ``build_status``,
+CLI does not take on a direct dependency on module-level globals; instead it
+reads them through the accessor. The accessor contract is simply "exposes the
+workflow's public entrypoints": ``build_status``,
 ``reconcile``, ``doctor``, ``dispatch_*``, ``publish_ready_pr``,
 ``push_pr_update``, ``merge_and_promote``, ``tick``, ``wake_named_jobs``,
 ``wake_core_jobs``, ``set_core_jobs_enabled``, ``write_lane_state``,
@@ -29,7 +26,7 @@ is simply "exposes the wrapper's public entrypoints": ``build_status``,
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Operate the OpenClaw YoyoPod workflow automation.")
+    parser = argparse.ArgumentParser(description="Operate the code-review workflow automation.")
     sub = parser.add_subparsers(dest="command", required=True)
 
     status_parser = sub.add_parser("status", help="Show workflow status and health.")
@@ -52,9 +49,9 @@ def build_parser() -> argparse.ArgumentParser:
     wake_job = sub.add_parser("wake-job", help="Wake one named job now by pulling its next run forward.")
     wake_job.add_argument("name", help="Exact cron job name to wake.")
 
-    sub.add_parser("pause", help="Disable the core YoyoPod workflow jobs.")
-    sub.add_parser("resume", help="Enable the core YoyoPod workflow jobs and wake them now.")
-    sub.add_parser("wake", help="Wake the core YoyoPod workflow jobs now without changing enablement intent.")
+    sub.add_parser("pause", help="Disable the core workflow jobs.")
+    sub.add_parser("resume", help="Enable the core workflow jobs and wake them now.")
+    sub.add_parser("wake", help="Wake the core workflow jobs now without changing enablement intent.")
     sub.add_parser("show-active-lane", help="Print the active-lane issue only.")
     sub.add_parser("show-core-jobs", help="Print only the core workflow job summaries.")
     sub.add_parser("show-lane-state", help="Print the current active lane state artifact.")
@@ -130,11 +127,11 @@ def print_status(status: dict[str, Any], *, health_path: str, audit_log_path: st
 
 
 def main(workspace: Any, argv: list[str] | None = None) -> int:
-    """Dispatch a YoYoPod CLI command against the provided ``workspace`` module.
+    """Dispatch a workflow CLI command against the provided ``workspace`` module.
 
-    ``workspace`` is expected to expose the wrapper's public entrypoints and
+    ``workspace`` is expected to expose the workflow's public entrypoints and
     config constants (``build_status``, ``reconcile``, ``HEALTH_PATH``, etc.).
-    Passing the wrapper module directly is the intended usage.
+    Passing a workspace accessor directly is the intended usage.
     """
     parser = build_parser()
     args = parser.parse_args(argv)

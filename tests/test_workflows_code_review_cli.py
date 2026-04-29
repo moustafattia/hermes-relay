@@ -35,7 +35,7 @@ def _make_workspace(**overrides):
         calls=calls,
         HEALTH_PATH=Path("/tmp/health.json"),
         AUDIT_LOG_PATH=Path("/tmp/audit.jsonl"),
-        WORKFLOW_WATCHDOG_JOB_NAME="yoyopod-workflow-watchdog",
+        WORKFLOW_WATCHDOG_JOB_NAME="workflow-watchdog",
         build_status=_recorder("build_status", {
             "updatedAt": "2026-04-24T00:00:00Z",
             "activeLane": {"number": 224, "title": "T"},
@@ -43,7 +43,7 @@ def _make_workspace(**overrides):
             "openPr": None,
             "health": "healthy",
             "ledger": {"workflowState": "implementing_local", "workflowIdle": False},
-            "implementation": {"worktree": "/tmp/worktree", "branch": "yoyopod-issue-224", "status": "implementing_local", "laneStatePath": "/tmp/lane.json", "laneMemoPath": "/tmp/lane.md"},
+            "implementation": {"worktree": "/tmp/worktree", "branch": "codex/issue-224-demo", "status": "implementing_local", "laneStatePath": "/tmp/lane.json", "laneMemoPath": "/tmp/lane.md"},
             "reviews": {},
             "derivedReviewLoopState": "awaiting_reviews",
             "preflight": {"interReviewAgent": {"shouldRun": True, "currentHeadSha": "abc", "wakeSuggested": True}},
@@ -143,8 +143,8 @@ def test_pause_resume_wake_each_call_their_workspace_helpers():
 
 def test_wake_job_forwards_name():
     ws = _make_workspace()
-    _run_main(ws, ["wake-job", "yoyopod-workflow-watchdog"])
-    assert ws.calls[0] == ("wake_named_jobs", (["yoyopod-workflow-watchdog"],), {})
+    _run_main(ws, ["wake-job", "workflow-watchdog"])
+    assert ws.calls[0] == ("wake_named_jobs", (["workflow-watchdog"],), {})
 
 
 def test_preflight_inter_review_agent_can_wake_when_suggested():

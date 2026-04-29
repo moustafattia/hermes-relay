@@ -94,11 +94,15 @@ def test_schema_rejects_extra_property_on_subscription():
         Draft7Validator(_schema()).validate(cfg)
 
 
-def test_existing_yoyopod_workflow_yaml_still_validates():
-    yoyopod = Path(os.path.expanduser("~/.hermes/workflows/yoyopod/config/workflow.yaml"))
-    if not yoyopod.exists():
-        pytest.skip("yoyopod workspace not present on this host")
-    cfg = yaml.safe_load(yoyopod.read_text())
+def test_existing_installed_workflow_yaml_still_validates():
+    plugin_dir = Path.home() / ".hermes" / "plugins" / "daedalus"
+    if not plugin_dir.exists():
+        pytest.skip("installed workflow plugin not present on this host")
+    workflow_root = plugin_dir.resolve().parents[2]
+    workflow_yaml = workflow_root / "config" / "workflow.yaml"
+    if not workflow_yaml.exists():
+        pytest.skip("installed workflow config not present on this host")
+    cfg = yaml.safe_load(workflow_yaml.read_text())
     Draft7Validator(_schema()).validate(cfg)
 
 

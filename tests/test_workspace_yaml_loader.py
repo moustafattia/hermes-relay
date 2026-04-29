@@ -1,11 +1,4 @@
-"""Regression test: load_workspace_from_config reads workflow.yaml.
-
-The workflows-contract migration moved the canonical config from
-config/yoyopod-workflow.json to config/workflow.yaml. The legacy loader
-must detect and read the new location so callers (runtime.py via
-_load_legacy_workflow_module, and workflows/code_review/status.py:build_status)
-keep working on YAML-migrated workspaces.
-"""
+"""Regression tests for YAML-only workflow workspace loading."""
 import importlib.util
 from pathlib import Path
 
@@ -37,7 +30,7 @@ def _yaml_config(repo_path: Path) -> dict:
     return {
         "workflow": "code-review",
         "schema-version": 1,
-        "instance": {"name": "yoyopod", "engine-owner": "hermes"},
+        "instance": {"name": "workflow-engine", "engine-owner": "hermes"},
         "repository": {
             "local-path": str(repo_path),
             "github-slug": "owner/repo",
@@ -91,7 +84,7 @@ def _yaml_config(repo_path: Path) -> dict:
 
 
 def test_load_workspace_from_config_prefers_workflow_yaml(tmp_path):
-    """When workflow.yaml exists, it must be read (and bridged) to build the workspace."""
+    """When workflow.yaml exists, it must be read to build the workspace."""
     workspace = _load_workspace_module()
     workspace_root = tmp_path / "workflow"
     config_dir = workspace_root / "config"
@@ -110,68 +103,34 @@ def test_load_workspace_from_config_prefers_workflow_yaml(tmp_path):
     assert ws.ENGINE_OWNER == "hermes"
 
 
-def test_load_workspace_from_config_yaml_takes_precedence_over_legacy_json(tmp_path):
-    """If both YAML and legacy JSON exist, prefer the YAML (post-migration source of truth)."""
+def test_load_workspace_from_config_accepts_explicit_yaml_path(tmp_path):
     workspace = _load_workspace_module()
     workspace_root = tmp_path / "workflow"
     config_dir = workspace_root / "config"
     config_dir.mkdir(parents=True)
     cfg = _yaml_config(tmp_path / "yaml-repo")
-    (config_dir / "workflow.yaml").write_text(
-        yaml.safe_dump(cfg), encoding="utf-8"
-    )
-    # Legacy JSON points at a different repo path; if it's read, we'd see it.
-    legacy = {
-        "repoPath": str(tmp_path / "json-repo"),
-        "cronJobsPath": str(tmp_path / "cron.json"),
-        "ledgerPath": str(tmp_path / "ledger.json"),
-        "healthPath": str(tmp_path / "health.json"),
-        "auditLogPath": str(tmp_path / "audit.jsonl"),
-        "engineOwner": "openclaw",
-        "activeLaneLabel": "active-lane",
-        "coreJobNames": [],
-        "hermesJobNames": [],
-    }
-    import json as _json
-    (config_dir / "yoyopod-workflow.json").write_text(
-        _json.dumps(legacy), encoding="utf-8"
-    )
+    path = config_dir / "workflow.yaml"
+    path.write_text(yaml.safe_dump(cfg), encoding="utf-8")
 
-    ws = workspace.load_workspace_from_config(workspace_root=workspace_root)
+    ws = workspace.load_workspace_from_config(workspace_root=workspace_root, config_path=path)
 
     assert ws.REPO_PATH == Path(tmp_path / "yaml-repo")
     assert ws.ENGINE_OWNER == "hermes"
 
 
-def test_load_workspace_from_config_falls_back_to_legacy_json(tmp_path):
-    """If only the legacy JSON exists (unmigrated workspace), it still works."""
+def test_load_workspace_from_config_rejects_json_config_path(tmp_path):
     workspace = _load_workspace_module()
     workspace_root = tmp_path / "workflow"
     config_dir = workspace_root / "config"
     config_dir.mkdir(parents=True)
-    legacy = {
-        "repoPath": str(tmp_path / "json-repo"),
-        "cronJobsPath": str(tmp_path / "cron.json"),
-        "ledgerPath": str(tmp_path / "ledger.json"),
-        "healthPath": str(tmp_path / "health.json"),
-        "auditLogPath": str(tmp_path / "audit.jsonl"),
-        "engineOwner": "openclaw",
-        "activeLaneLabel": "active-lane",
-        "coreJobNames": [],
-        "hermesJobNames": [],
-    }
-    import json as _json
-    (config_dir / "yoyopod-workflow.json").write_text(
-        _json.dumps(legacy), encoding="utf-8"
-    )
+    json_path = config_dir / "workflow.json"
+    json_path.write_text("{}", encoding="utf-8")
 
-    ws = workspace.load_workspace_from_config(workspace_root=workspace_root)
-
-    assert ws.REPO_PATH == Path(tmp_path / "json-repo")
-
+    with pytest.raises(ValueError):
+        workspace.load_workspace_from_config(workspace_root=workspace_root, config_path=json_path)
 
 def test_load_workspace_from_config_raises_when_no_config_present(tmp_path):
-    """If neither workflow.yaml nor yoyopod-workflow.json exists, raise FileNotFoundError."""
+    """If workflow.yaml is missing, raise FileNotFoundError."""
     workspace = _load_workspace_module()
     workspace_root = tmp_path / "workflow"
     (workspace_root / "config").mkdir(parents=True)

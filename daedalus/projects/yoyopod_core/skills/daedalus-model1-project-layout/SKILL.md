@@ -84,14 +84,13 @@ It should own:
 - runtime db/event-log path resolution
 - alert-state path resolution
 - project-data-root discovery
-- plugin-entrypoint path lookup (the canonical workflow CLI at `<workflow_root>/.hermes/plugins/daedalus/workflows/__main__.py --workflow-root /home/radxa/.hermes/workflows/yoyopod`; the earlier `scripts/yoyopod_workflow.py` wrapper has been retired)
+- plugin-entrypoint path lookup (the canonical workflow CLI at `~/.hermes/plugins/daedalus/workflows/__main__.py --workflow-root /home/radxa/.hermes/workflows/yoyopod`; the earlier `scripts/yoyopod_workflow.py` wrapper has been retired)
 - runtime-layout fallback rules: if `runtime/` exists under the workflow root, store mutable state under `runtime/{memory,state,logs}`; otherwise fall back to the legacy top-level `memory/` and `state/` layout
 
 Recommended default workflow-root resolution order learned from the migration slice:
 1. explicit env var (`DAEDALUS_WORKFLOW_ROOT`)
-2. installed candidate if it already has a legacy wrapper or project-runtime layout
-3. legacy `~/.hermes/workflows/yoyopod` if it already exists
-4. repo-local `projects/yoyopod_core/` as the Model 1 target default
+2. current working directory or nearest ancestor containing `config/workflow.yaml`
+3. repo-local `projects/yoyopod_core/` as the Model 1 target default
 
 This keeps the migration from spreading path assumptions across `runtime.py`, `tools.py`, and `alerts.py`.
 

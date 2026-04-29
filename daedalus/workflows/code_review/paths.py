@@ -1,22 +1,71 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Mapping
 
-PROJECT_SLUG = "yoyopod_core"
-PROJECT_DISPLAY_NAME = "yoyopod-core"
-WORKSPACE_REPO_NAME = "yoyopod-core"
 DEFAULT_WORKFLOW_ROOT_ENV_VARS = ("DAEDALUS_WORKFLOW_ROOT",)
+DEFAULT_WORKFLOW_CONFIG_FILENAME = "config/workflow.yaml"
+
+_PROJECT_KEY_CHARS_RE = re.compile(r"[^a-z0-9._-]+")
+_PROJECT_KEY_SEPARATORS_RE = re.compile(r"[-._]{2,}")
+_WORKFLOW_INSTANCE_SEGMENT_RE = re.compile(r"[^a-z0-9]+")
+
+def normalize_project_key(value: str | None) -> str:
+    text = str(value or "").strip().lower()
+    text = _PROJECT_KEY_CHARS_RE.sub("-", text)
+    text = _PROJECT_KEY_SEPARATORS_RE.sub("-", text)
+    text = text.strip("-.")
+    return text or "workflow"
 
 
-def repo_root() -> Path:
-    return Path(__file__).resolve().parents[2]
+def normalize_workflow_instance_segment(value: str | None) -> str:
+    text = str(value or "").strip().lower()
+    text = _WORKFLOW_INSTANCE_SEGMENT_RE.sub("-", text)
+    return text.strip("-")
 
 
-def project_data_root(*, plugin_dir: Path | None = None) -> Path:
-    base_dir = (plugin_dir or repo_root()).resolve()
-    return base_dir / "projects" / PROJECT_SLUG
+def derive_workflow_instance_name(*, github_slug: str, workflow_name: str) -> str:
+    slug = str(github_slug or "").strip()
+    if slug.count("/") != 1:
+        raise ValueError("github slug must use owner/repo format")
+    owner_raw, repo_raw = slug.split("/", 1)
+    owner = normalize_workflow_instance_segment(owner_raw)
+    repo = normalize_workflow_instance_segment(repo_raw)
+    workflow = normalize_workflow_instance_segment(workflow_name)
+    if not owner or not repo or not workflow:
+        raise ValueError("workflow instance name requires non-empty owner, repo, and workflow segments")
+    return f"{owner}-{repo}-{workflow}"
+
+
+def workflow_config_path(workflow_root: Path) -> Path:
+    return workflow_root.resolve() / DEFAULT_WORKFLOW_CONFIG_FILENAME
+
+
+def load_workflow_config(workflow_root: Path) -> dict:
+    import yaml  # type: ignore[import]
+
+    path = workflow_config_path(workflow_root)
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"{path} must contain a YAML mapping at the top level")
+    return payload
+
+
+def workflow_instance_name(workflow_root: Path) -> str:
+    config = load_workflow_config(workflow_root)
+    instance = config.get("instance")
+    if not isinstance(instance, dict):
+        raise ValueError(f"{workflow_config_path(workflow_root)} is missing required instance config")
+    name = str(instance.get("name") or "").strip()
+    if not name:
+        raise ValueError(f"{workflow_config_path(workflow_root)} is missing instance.name")
+    return name
+
+
+def project_key_for_workflow_root(workflow_root: Path) -> str:
+    return normalize_project_key(workflow_instance_name(workflow_root))
 
 
 def _has_project_runtime_layout(workflow_root: Path) -> bool:
@@ -61,27 +110,43 @@ def tick_dispatch_history_dir(workflow_root: Path) -> Path:
     return tick_dispatch_dir(workflow_root) / "history"
 
 
-def plugin_entrypoint_path(workflow_root: Path) -> Path:
-    """Path to the installed plugin's generic CLI dispatcher.
+def plugin_root_path(*, plugin_dir: Path | None = None) -> Path:
+    """Return the active plugin root directory.
 
-    Lives at ``<workflow_root>/.hermes/plugins/daedalus/workflows/__main__.py``.
-    This is the canonical external-caller surface (systemd, cron, operator
-    commands, skill docs all reference this path). Per-workflow direct-form
-    invocations use ``python3 -m workflows.<name>`` inside the plugin root.
+    Daedalus now runs as a globally installed plugin under
+    ``~/.hermes/plugins/daedalus``. The workflow root contains config and
+    mutable state, but not a private plugin copy. When running from source,
+    this resolves to the repo's ``daedalus/`` directory.
     """
-    root = workflow_root.resolve()
-    return (
-        root / ".hermes" / "plugins" / "daedalus" / "workflows" / "__main__.py"
-    )
+    if plugin_dir is not None:
+        candidate = Path(plugin_dir).expanduser().resolve()
+        if candidate.name == "workflows":
+            return candidate.parent
+        return candidate
+    return Path(__file__).resolve().parents[2]
+
+
+def plugin_entrypoint_path(workflow_root: Path | None = None, *, plugin_dir: Path | None = None) -> Path:
+    """Path to the plugin's generic CLI dispatcher.
+
+    ``workflow_root`` is accepted for API compatibility but no longer affects
+    resolution: the engine/workflow code lives in the global plugin install,
+    not inside the workflow root.
+    """
+    del workflow_root
+    return plugin_root_path(plugin_dir=plugin_dir) / "workflows" / "__main__.py"
+
+
+def plugin_runtime_path(*, plugin_dir: Path | None = None) -> Path:
+    return plugin_root_path(plugin_dir=plugin_dir) / "runtime.py"
 
 
 def workflow_cli_argv(workflow_root: Path, *command_args: str) -> list[str]:
     """Build the argv list to invoke the workflow CLI via the generic dispatcher.
 
-    Always targets the plugin-side entrypoint. If the plugin is not installed
-    under ``workflow_root``, the returned path still points at the expected
-    install location — callers get a clear ``FileNotFoundError`` at subprocess
-    spawn time, which reliably directs operators to run ``./scripts/install.sh``.
+    Always targets the active plugin install's entrypoint. The workflow root is
+    passed through to the subprocess, but it no longer participates in plugin
+    code resolution.
 
     Uses ``sys.executable`` instead of bare ``"python3"`` so the subprocess
     runs under the same interpreter the calling runtime is using. Bare
@@ -95,12 +160,12 @@ def workflow_cli_argv(workflow_root: Path, *command_args: str) -> list[str]:
     return [sys.executable, str(plugin_path), *command_args]
 
 
-# Back-compat alias; remove in 0.3.0
-yoyopod_cli_argv = workflow_cli_argv
-
-
-def _has_installed_plugin(workflow_root: Path) -> bool:
-    return plugin_entrypoint_path(workflow_root).exists()
+def _find_workflow_root(start: Path) -> Path | None:
+    path = start.expanduser().resolve()
+    for candidate in (path, *path.parents):
+        if workflow_config_path(candidate).exists():
+            return candidate
+    return None
 
 
 def resolve_default_workflow_root(
@@ -108,23 +173,22 @@ def resolve_default_workflow_root(
     plugin_dir: Path,
     env: Mapping[str, str] | None = None,
     home: Path | None = None,
+    cwd: Path | None = None,
 ) -> Path:
+    del home
     env_map = env if env is not None else os.environ
     for env_var in DEFAULT_WORKFLOW_ROOT_ENV_VARS:
         value = env_map.get(env_var)
         if value:
             return Path(value).expanduser().resolve()
 
-    installed_candidate = plugin_dir.parent.parent.parent.resolve()
-    if _has_installed_plugin(installed_candidate) or _has_project_runtime_layout(installed_candidate):
-        return installed_candidate
+    cwd_path = (cwd or Path.cwd()).expanduser().resolve()
+    detected = _find_workflow_root(cwd_path)
+    if detected is not None:
+        return detected
 
-    legacy_project_candidate = ((home or Path.home()) / ".hermes" / "workflows" / "yoyopod").resolve()
-    if _has_installed_plugin(legacy_project_candidate) or _has_project_runtime_layout(legacy_project_candidate):
-        return legacy_project_candidate
-
-    repo_project_candidate = project_data_root(plugin_dir=plugin_dir)
-    if _has_project_runtime_layout(repo_project_candidate):
-        return repo_project_candidate.resolve()
-
-    return repo_project_candidate.resolve()
+    plugin_dir = plugin_root_path(plugin_dir=plugin_dir)
+    repo_parent = plugin_dir.parent.resolve()
+    if workflow_config_path(repo_parent).exists():
+        return repo_parent
+    return cwd_path

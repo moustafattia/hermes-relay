@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 
-"""YoYoPod Core GitHub integration helpers.
+"""Code-review workflow GitHub integration helpers.
 
 This slice extracts project-specific GitHub helpers so wrapper compatibility code
 can delegate deterministic issue/label selection and simple GH command assembly

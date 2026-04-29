@@ -56,7 +56,7 @@ def test_expected_lane_worktree_uses_tmp_issue_path():
 
     result = sessions_module.expected_lane_worktree(224)
 
-    assert result == Path('/tmp/yoyopod-issue-224')
+    assert result == Path('/tmp/issue-224')
 
 
 
@@ -82,7 +82,7 @@ def test_issue_number_extractors_parse_branch_and_worktree():
     sessions_module = load_module("daedalus_workflows_code_review_sessions_test", "workflows/code_review/sessions.py")
 
     assert sessions_module.issue_number_from_branch('codex/issue-224-something') == 224
-    assert sessions_module.issue_number_from_worktree('/tmp/yoyopod-issue-224') == 224
+    assert sessions_module.issue_number_from_worktree('/tmp/issue-224') == 224
 
 
 
@@ -92,7 +92,7 @@ def test_implementation_lane_matches_when_any_lane_hint_matches():
     result = sessions_module.implementation_lane_matches(
         {
             'branch': 'codex/issue-224-something',
-            'worktree': '/tmp/yoyopod-issue-999',
+            'worktree': '/tmp/issue-999',
             'laneState': {'issue': {'number': 111}},
         },
         224,
@@ -160,7 +160,7 @@ def test_build_and_record_session_nudge_payload_capture_session_issue_and_pr_con
         session_action={"action": "poke-session", "reason": "stale-open-session", "sessionName": "lane-224"},
         issue={"number": 224, "title": "Issue 224"},
         open_pr={"number": 301, "url": "https://example.com/pull/301", "headRefOid": "abc123"},
-        lane_memo_path="/tmp/yoyopod-issue-224/.lane-memo.md",
+        lane_memo_path="/tmp/issue-224/.lane-memo.md",
         now_iso="2026-04-23T00:20:00Z",
     )
 
@@ -189,15 +189,15 @@ def test_assess_codex_session_health_marks_recent_session_healthy_and_mid_stale_
     sessions_module = load_module("daedalus_workflows_code_review_sessions_test", "workflows/code_review/sessions.py")
 
     healthy = sessions_module.assess_codex_session_health(
-        {"name": "lane-224", "cwd": "/tmp/yoyopod-issue-224", "last_used_at": "2026-04-23T00:09:30Z"},
-        Path("/tmp/yoyopod-issue-224"),
+        {"name": "lane-224", "cwd": "/tmp/issue-224", "last_used_at": "2026-04-23T00:09:30Z"},
+        Path("/tmp/issue-224"),
         now_epoch=1_776_903_000,
         freshness_seconds=120,
         poke_grace_seconds=600,
     )
     pokeable = sessions_module.assess_codex_session_health(
-        {"name": "lane-224", "cwd": "/tmp/yoyopod-issue-224", "last_used_at": "2026-04-23T00:04:30Z"},
-        Path("/tmp/yoyopod-issue-224"),
+        {"name": "lane-224", "cwd": "/tmp/issue-224", "last_used_at": "2026-04-23T00:04:30Z"},
+        Path("/tmp/issue-224"),
         now_epoch=1_776_903_000,
         freshness_seconds=120,
         poke_grace_seconds=600,
@@ -226,17 +226,17 @@ def test_assess_codex_session_health_rejects_closed_wrong_worktree_and_missing_l
 
     closed = sessions_module.assess_codex_session_health(
         {"name": "lane-224", "closed": True, "last_used_at": "2026-04-23T00:09:30Z"},
-        Path("/tmp/yoyopod-issue-224"),
+        Path("/tmp/issue-224"),
         now_epoch=1_776_903_000,
     )
     wrong_worktree = sessions_module.assess_codex_session_health(
         {"name": "lane-224", "cwd": "/tmp/other", "last_used_at": "2026-04-23T00:09:30Z"},
-        Path("/tmp/yoyopod-issue-224"),
+        Path("/tmp/issue-224"),
         now_epoch=1_776_903_000,
     )
     missing_last_used = sessions_module.assess_codex_session_health(
-        {"name": "lane-224", "cwd": "/tmp/yoyopod-issue-224"},
-        Path("/tmp/yoyopod-issue-224"),
+        {"name": "lane-224", "cwd": "/tmp/issue-224"},
+        Path("/tmp/issue-224"),
         now_epoch=1_776_903_000,
     )
 

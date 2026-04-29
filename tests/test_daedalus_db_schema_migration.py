@@ -27,7 +27,7 @@ def test_migrate_schema_identity_renames_relay_runtime_table(tmp_path):
                 schema_version INTEGER
             );
             INSERT INTO relay_runtime (runtime_id, project_key, schema_version)
-                VALUES ('relay', 'yoyopod', 1);
+                VALUES ('relay', 'workflow-example', 1);
             """
         )
         conn.commit()
@@ -51,7 +51,7 @@ def test_migrate_schema_identity_renames_relay_runtime_table(tmp_path):
         )
         row = cur.fetchone()
         assert row is not None
-        assert row[0] == 'yoyopod'
+        assert row[0] == 'workflow-example'
 
         cur = conn.execute("SELECT 1 FROM daedalus_runtime WHERE runtime_id='relay'")
         assert cur.fetchone() is None
@@ -72,7 +72,7 @@ def test_migrate_schema_identity_idempotent_on_already_migrated_db(tmp_path):
                 project_key TEXT
             );
             INSERT INTO daedalus_runtime (runtime_id, project_key)
-                VALUES ('daedalus', 'yoyopod');
+                VALUES ('daedalus', 'workflow-example');
             """
         )
         conn.commit()
@@ -83,7 +83,7 @@ def test_migrate_schema_identity_idempotent_on_already_migrated_db(tmp_path):
         cur = conn.execute(
             "SELECT project_key FROM daedalus_runtime WHERE runtime_id='daedalus'"
         )
-        assert cur.fetchone()[0] == 'yoyopod'
+        assert cur.fetchone()[0] == 'workflow-example'
     finally:
         conn.close()
 

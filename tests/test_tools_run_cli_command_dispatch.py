@@ -78,7 +78,7 @@ def test_run_cli_command_dispatches_get_observability(tmp_path, capsys):
 
 def test_run_cli_command_dispatches_watch(tmp_path, capsys):
     """Drive ``watch --once`` via run_cli_command (the argparse CLI path)."""
-    root = tmp_path / "yoyopod_core"
+    root = tmp_path / "workflow_example"
     (root / "runtime" / "memory").mkdir(parents=True)
     (root / "runtime" / "state" / "daedalus").mkdir(parents=True)
     (root / "config").mkdir()
@@ -93,3 +93,23 @@ def test_run_cli_command_dispatches_watch(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "unknown daedalus command" not in out, out
     assert "Daedalus active lanes" in out or "active lanes" in out.lower()
+
+
+def test_run_cli_command_dispatches_scaffold_workflow(tmp_path, capsys):
+    tools = _tools()
+    root = tmp_path / "attmous-daedalus-code-review"
+    args = _parse(
+        tools,
+        [
+            "scaffold-workflow",
+            "--workflow-root",
+            str(root),
+            "--github-slug",
+            "attmous/daedalus",
+        ],
+    )
+    tools.run_cli_command(args)
+    out = capsys.readouterr().out
+    assert "unknown daedalus command" not in out, out
+    assert "scaffolded workflow root" in out
+    assert (root / "config" / "workflow.yaml").exists()

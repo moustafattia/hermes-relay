@@ -26,7 +26,7 @@ def _seed_workspace(workflow_root: Path, *, raw_status: dict) -> None:
     """
     config_dir = workflow_root / "config"
     config_dir.mkdir(parents=True, exist_ok=True)
-    config_path = config_dir / "yoyopod-workflow.json"
+    config_path = config_dir / "legacy-workflow.json"
     config_path.write_text(
         json.dumps({
             "repoPath": str(workflow_root / "repo"),
@@ -184,7 +184,7 @@ def test_normalize_implementation_for_active_lane_preserves_matching_lane_and_se
     )
 
     assert result["session"] == "keep-me"
-    assert result["worktree"] == "/tmp/yoyopod-issue-224"
+    assert result["worktree"] == "/tmp/issue-224"
     assert result["branch"] == "codex/issue-224-pr-head"
     assert result["sessionRuntime"] == "acpx-codex"
     assert result["sessionName"] == "lane-224"
@@ -198,7 +198,7 @@ def test_normalize_implementation_for_active_lane_resets_mismatched_lane_to_fres
         {
             "session": "stale-session",
             "previousSession": "older-session",
-            "worktree": "/tmp/yoyopod-issue-999",
+            "worktree": "/tmp/issue-999",
             "branch": "codex/issue-999-wrong",
             "status": "findings_open",
         },
@@ -210,7 +210,7 @@ def test_normalize_implementation_for_active_lane_resets_mismatched_lane_to_fres
     assert result == {
         "session": None,
         "previousSession": "stale-session",
-        "worktree": "/tmp/yoyopod-issue-224",
+        "worktree": "/tmp/issue-224",
         "updatedAt": None,
         "branch": "codex/issue-224-active-lane",
         "status": "implementing",
@@ -434,7 +434,7 @@ def test_write_lane_memo_writes_rendered_markdown(tmp_path):
     body = status_module.write_lane_memo(
         worktree=worktree,
         issue={"number": 224, "title": "Test lane", "url": "https://example.test/issue/224"},
-        branch="yoyopod-issue-224",
+        branch="issue-224",
         open_pr=None,
         repair_brief=None,
         latest_progress={"kind": "implementing_local", "at": "2026-04-22T00:00:00Z"},
@@ -477,14 +477,14 @@ def test_write_lane_state_emits_expected_payload_shape(tmp_path):
     result = status_module.write_lane_state(
         worktree=worktree,
         issue={"number": 224, "title": "T", "url": "https://example.test/issue/224"},
-        open_pr={"number": 301, "url": "https://example.test/pr/301", "headRefName": "yoyopod-issue-224", "headRefOid": "prsha"},
+        open_pr={"number": 301, "url": "https://example.test/pr/301", "headRefName": "issue-224", "headRefOid": "prsha"},
         implementation={
             "session": "session-224",
             "activeSessionHealth": {"healthy": True, "lastUsedAt": "2026-04-22T00:00:00Z"},
             "updatedAt": "2026-04-22T00:00:00Z",
             "status": "implementing_local",
             "publishStatus": None,
-            "branch": "yoyopod-issue-224",
+            "branch": "issue-224",
             "localHeadSha": "localsha",
             "lastDispatchAttemptId": None,
             "lastDispatchAt": None,
@@ -654,7 +654,7 @@ def test_apply_idle_ledger_transition_resets_active_lane_state():
         "workflowState": "implementing_local",
         "reviewState": "implementing_local",
         "reviewLoopState": "awaiting_reviews",
-        "branch": "yoyopod-issue-224",
+        "branch": "issue-224",
         "openActiveLanePr": "https://example.test/pr/1",
         "blockedReason": "something",
         "repairBrief": {"mustFix": []},
@@ -717,9 +717,9 @@ def test_apply_active_lane_ledger_transition_sets_approved_for_clean_publish_rea
     status_module.apply_active_lane_ledger_transition(
         ledger,
         active_lane={"number": 224},
-        open_pr={"number": 301, "url": "https://example.test/pr/301", "headRefName": "yoyopod-issue-224", "headRefOid": "prsha", "isDraft": False},
+        open_pr={"number": 301, "url": "https://example.test/pr/301", "headRefName": "issue-224", "headRefOid": "prsha", "isDraft": False},
         implementation={
-            "branch": "yoyopod-issue-224",
+            "branch": "issue-224",
             "localHeadSha": "prsha",
             "commitsAhead": 0,
             "laneState": {},
@@ -750,7 +750,7 @@ def test_apply_active_lane_ledger_transition_forces_operator_attention_reason_wh
         ledger,
         active_lane={"number": 224},
         open_pr=None,
-        implementation={"branch": "yoyopod-issue-224", "localHeadSha": "localsha", "commitsAhead": 1, "laneState": {}},
+        implementation={"branch": "issue-224", "localHeadSha": "localsha", "commitsAhead": 1, "laneState": {}},
         reviews={"claudeCode": {}, "codexCloud": {}},
         previous_internal_review={},
         publish_ready=False,
@@ -775,7 +775,7 @@ def test_apply_active_lane_ledger_transition_prepublish_routes_through_claude_fi
         active_lane={"number": 224},
         open_pr=None,
         implementation={
-            "branch": "yoyopod-issue-224",
+            "branch": "issue-224",
             "localHeadSha": "head123",
             "commitsAhead": 1,
             "laneState": {},
@@ -849,7 +849,7 @@ def test_assemble_status_payload_returns_fully_shaped_status_dict():
     reviews = {"internalReview": {"model": "claude-sonnet-4-6"}, "externalReview": {}, "rockClaw": {}}
     implementation = {
         "worktree": "/tmp/worktree",
-        "branch": "yoyopod-issue-224",
+        "branch": "issue-224",
         "session": "session-224",
         "sessionRuntime": "acpx-codex",
         "sessionName": "lane-224",
@@ -876,7 +876,7 @@ def test_assemble_status_payload_returns_fully_shaped_status_dict():
         effective_repair_brief=None,
         implementation=implementation,
         local_head_sha="localsha",
-        worktree_branch="yoyopod-issue-224",
+        worktree_branch="issue-224",
         worktree_commits_ahead=1,
         lane_state_path_str=None,
         lane_memo_path_str=None,
@@ -913,7 +913,7 @@ def test_assemble_status_payload_returns_fully_shaped_status_dict():
     assert result["ledger"]["workflowState"] == "implementing_local"
     assert result["ledger"]["readyToCloseCount"] == 0
     assert result["implementation"]["publishStatus"] == "not_published"
-    assert result["implementation"]["branch"] == "yoyopod-issue-224"
+    assert result["implementation"]["branch"] == "issue-224"
     assert result["preflight"]["claudeReview"]["shouldRun"] is False
     assert result["preflight"]["interReviewAgent"] == result["preflight"]["claudeReview"]
     assert result["reviews"]["interReviewAgent"] == reviews["internalReview"]
@@ -962,7 +962,7 @@ def test_apply_ledger_implementation_merge_preserves_prior_ledger_keys():
             "localHeadSha": "localsha",
             "publishStatus": "not_published",
             "updatedAt": "2026-04-23T00:01:00Z",
-            "branch": "yoyopod-issue-224",
+            "branch": "issue-224",
             "status": "implementing_local",
             "lastDispatchAttemptId": "attempt-1",
             "lastDispatchAt": "2026-04-23T00:00:00Z",

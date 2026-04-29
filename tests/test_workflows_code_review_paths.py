@@ -1,6 +1,8 @@
 import importlib.util
 from pathlib import Path
 
+import yaml
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1] / "daedalus"
 
@@ -14,9 +16,42 @@ def load_module(module_name: str, relative_path: str):
     return module
 
 
+def _write_workflow_yaml(workflow_root: Path, *, instance_name: str = "blueprint-engine") -> None:
+    config_dir = workflow_root / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    (config_dir / "workflow.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "workflow": "code-review",
+                "schema-version": 1,
+                "instance": {"name": instance_name, "engine-owner": "hermes"},
+                "repository": {
+                    "local-path": str(workflow_root / "repo"),
+                    "github-slug": "owner/repo",
+                    "active-lane-label": "active-lane",
+                },
+                "runtimes": {"acpx-codex": {"kind": "acpx-codex"}},
+                "agents": {
+                    "coder": {"default": {"name": "Internal_Coder_Agent", "model": "gpt-5.3-codex", "runtime": "acpx-codex"}},
+                    "internal-reviewer": {"name": "Internal_Reviewer_Agent", "model": "claude-sonnet-4-6", "runtime": "acpx-codex"},
+                    "external-reviewer": {"enabled": True, "name": "External_Reviewer_Agent"},
+                },
+                "gates": {"internal-review": {}, "external-review": {}, "merge": {}},
+                "triggers": {"lane-selector": {"type": "github-label", "label": "active-lane"}},
+                "storage": {
+                    "ledger": "memory/workflow-status.json",
+                    "health": "memory/workflow-health.json",
+                    "audit-log": "memory/workflow-audit.jsonl",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 def test_runtime_paths_use_project_runtime_subdirs_when_present(tmp_path):
     paths_module = load_module("daedalus_workflows_code_review_paths_test", "workflows/code_review/paths.py")
-    workflow_root = tmp_path / "yoyopod_core"
+    workflow_root = tmp_path / "blueprint"
     (workflow_root / "runtime").mkdir(parents=True)
     (workflow_root / "config").mkdir()
     (workflow_root / "workspace").mkdir()
@@ -25,6 +60,18 @@ def test_runtime_paths_use_project_runtime_subdirs_when_present(tmp_path):
 
     assert paths["db_path"] == workflow_root / "runtime" / "state" / "daedalus" / "daedalus.db"
     assert paths["event_log_path"] == workflow_root / "runtime" / "memory" / "daedalus-events.jsonl"
+
+
+def test_derive_workflow_instance_name_uses_owner_repo_workflow_convention(tmp_path):
+    del tmp_path
+    paths_module = load_module("daedalus_workflows_code_review_paths_test", "workflows/code_review/paths.py")
+
+    name = paths_module.derive_workflow_instance_name(
+        github_slug="Attmous/Daedalus_Core",
+        workflow_name="code-review",
+    )
+
+    assert name == "attmous-daedalus-core-code-review"
 
 
 def test_runtime_paths_fall_back_to_legacy_layout_without_project_runtime(tmp_path):
@@ -37,24 +84,51 @@ def test_runtime_paths_fall_back_to_legacy_layout_without_project_runtime(tmp_pa
     assert paths["event_log_path"] == workflow_root / "memory" / "daedalus-events.jsonl"
 
 
-def test_resolve_default_workflow_root_prefers_repo_project_dir_when_no_env_or_legacy_root(tmp_path):
+def test_resolve_default_workflow_root_prefers_env_var(tmp_path):
     paths_module = load_module("daedalus_workflows_code_review_paths_test", "workflows/code_review/paths.py")
-    plugin_dir = tmp_path / "repo"
-    repo_project_root = plugin_dir / "projects" / "yoyopod_core"
-    repo_project_root.mkdir(parents=True)
-    (repo_project_root / "runtime").mkdir()
-    (repo_project_root / "config").mkdir()
-    home = tmp_path / "home"
-    home.mkdir()
+    workflow_root = tmp_path / "workflow-root"
 
-    resolved = paths_module.resolve_default_workflow_root(plugin_dir=plugin_dir, env={}, home=home)
+    resolved = paths_module.resolve_default_workflow_root(
+        plugin_dir=tmp_path / "plugin" / "daedalus",
+        env={"DAEDALUS_WORKFLOW_ROOT": str(workflow_root)},
+    )
 
-    assert resolved == repo_project_root.resolve()
+    assert resolved == workflow_root.resolve()
+
+
+def test_resolve_default_workflow_root_detects_cwd_ancestor_with_config(tmp_path):
+    paths_module = load_module("daedalus_workflows_code_review_paths_test", "workflows/code_review/paths.py")
+    workflow_root = tmp_path / "workflow-root"
+    nested = workflow_root / "workspace" / "repo" / "src"
+    _write_workflow_yaml(workflow_root)
+    nested.mkdir(parents=True)
+
+    resolved = paths_module.resolve_default_workflow_root(
+        plugin_dir=tmp_path / "plugin" / "daedalus",
+        env={},
+        cwd=nested,
+    )
+
+    assert resolved == workflow_root.resolve()
+
+
+def test_resolve_default_workflow_root_falls_back_to_cwd_when_no_config(tmp_path):
+    paths_module = load_module("daedalus_workflows_code_review_paths_test", "workflows/code_review/paths.py")
+    cwd = tmp_path / "scratch"
+    cwd.mkdir()
+
+    resolved = paths_module.resolve_default_workflow_root(
+        plugin_dir=tmp_path / "plugin" / "daedalus",
+        env={},
+        cwd=cwd,
+    )
+
+    assert resolved == cwd.resolve()
 
 
 def test_lane_state_and_memo_paths_resolve_under_worktree_and_handle_none(tmp_path):
     paths_module = load_module("daedalus_workflows_code_review_paths_test", "workflows/code_review/paths.py")
-    worktree = tmp_path / "yoyopod-issue-224"
+    worktree = tmp_path / "issue-224"
 
     assert paths_module.lane_state_path(worktree) == worktree / ".lane-state.json"
     assert paths_module.lane_memo_path(worktree) == worktree / ".lane-memo.md"
@@ -64,38 +138,28 @@ def test_lane_state_and_memo_paths_resolve_under_worktree_and_handle_none(tmp_pa
 
 def test_plugin_entrypoint_path_points_at_generic_dispatcher(tmp_path):
     paths_module = load_module("daedalus_workflows_code_review_paths_test", "workflows/code_review/paths.py")
-    workflow_root = tmp_path / "workflow"
-    expected = (
-        workflow_root.resolve()
-        / ".hermes"
-        / "plugins"
-        / "daedalus"
-        / "workflows"
-        / "__main__.py"
-    )
-    assert paths_module.plugin_entrypoint_path(workflow_root) == expected
+    expected = Path(paths_module.__file__).resolve().parents[2] / "workflows" / "__main__.py"
+    assert paths_module.plugin_entrypoint_path(tmp_path / "workflow") == expected
 
 
-def test_workflow_cli_argv_prefers_plugin_entrypoint_when_installed(tmp_path):
+def test_workflow_cli_argv_uses_global_plugin_entrypoint(tmp_path):
     paths_module = load_module("daedalus_workflows_code_review_paths_test", "workflows/code_review/paths.py")
     workflow_root = tmp_path / "workflow"
-    plugin_main = paths_module.plugin_entrypoint_path(workflow_root)
-    plugin_main.parent.mkdir(parents=True)
-    plugin_main.write_text("# main\n", encoding="utf-8")
 
     import sys as _sys
     argv = paths_module.workflow_cli_argv(workflow_root, "status", "--json")
-    assert argv == [_sys.executable, str(plugin_main), "status", "--json"]
+    assert argv == [_sys.executable, str(paths_module.plugin_entrypoint_path(workflow_root)), "status", "--json"]
 
 
-def test_yoyopod_cli_argv_is_backcompat_alias(tmp_path):
-    """yoyopod_cli_argv is a deprecated alias for workflow_cli_argv."""
+def test_project_key_for_workflow_root_reads_instance_name_from_workflow_yaml(tmp_path):
     paths_module = load_module("daedalus_workflows_code_review_paths_test", "workflows/code_review/paths.py")
-    assert paths_module.yoyopod_cli_argv is paths_module.workflow_cli_argv
+    workflow_root = tmp_path / "workflow"
+    _write_workflow_yaml(workflow_root, instance_name="Blueprint Engine")
+    assert paths_module.project_key_for_workflow_root(workflow_root) == "blueprint-engine"
 
 
 def test_workflow_cli_argv_always_targets_generic_dispatcher(tmp_path):
-    """The retired ``scripts/yoyopod_workflow.py`` wrapper is no longer a fallback.
+    """A local scripts wrapper is no longer a fallback.
 
     ``workflow_cli_argv`` should always build an argv targeting the plugin's
     generic dispatcher regardless of what happens to exist in the workflow root.
@@ -109,13 +173,13 @@ def test_workflow_cli_argv_always_targets_generic_dispatcher(tmp_path):
     # not bare "python3") so subprocess inherits the right pyyaml/jsonschema
     # environment regardless of PATH ordering on the host.
     assert argv[0] == _sys.executable
-    assert argv[1].endswith("/.hermes/plugins/daedalus/workflows/__main__.py")
+    assert argv[1].endswith("/workflows/__main__.py")
     assert argv[2:] == ["status", "--json"]
 
     # Even if a retired-style wrapper script appears under scripts/, it is
     # ignored — we no longer probe for or fall back to it.
-    wrapper = workflow_root / "scripts" / "yoyopod_workflow.py"
+    wrapper = workflow_root / "scripts" / "workflow_wrapper.py"
     wrapper.parent.mkdir(parents=True)
     wrapper.write_text("# retired\n", encoding="utf-8")
     argv2 = paths_module.workflow_cli_argv(workflow_root, "tick")
-    assert argv2[1].endswith("/.hermes/plugins/daedalus/workflows/__main__.py")
+    assert argv2[1].endswith("/workflows/__main__.py")

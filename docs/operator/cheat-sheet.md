@@ -3,8 +3,8 @@
 ## 1. 10-second mental model
 
 - **Workflow CLI** = the policy brain, exposed via
-  `~/.hermes/plugins/daedalus/workflows/__main__.py --workflow-root ~/.hermes/workflows/yoyopod`
-  (historically: "the wrapper" at `scripts/yoyopod_workflow.py`, now retired)
+  `~/.hermes/plugins/daedalus/workflows/__main__.py --workflow-root ~/.hermes/workflows/<owner>-<repo>-<workflow-type>`
+  (historically this replaced a workflow-local wrapper script, now retired)
 - **Daedalus runtime** = durable orchestrator around that brain
 - **systemd active service** = keeps Daedalus alive 24/7
 - **Codex** = internal coder
@@ -24,20 +24,20 @@ If status looks weird, always ask:
 
 ## 2. Core surfaces
 
-### Workflow CLI (plugin-owned; replaces retired `scripts/yoyopod_workflow.py`)
+### Workflow CLI (plugin-owned; replaces the retired workflow-local wrapper)
 ```bash
-python3 ~/\.hermes/workflows/yoyopod/.hermes/plugins/daedalus/workflows/__main__.py --workflow-root ~/.hermes/workflows/yoyopod status --json
-python3 ~/\.hermes/workflows/yoyopod/.hermes/plugins/daedalus/workflows/__main__.py --workflow-root ~/.hermes/workflows/yoyopod tick --json
-python3 ~/\.hermes/workflows/yoyopod/.hermes/plugins/daedalus/workflows/__main__.py --workflow-root ~/.hermes/workflows/yoyopod dispatch-implementation-turn --json
-python3 ~/\.hermes/workflows/yoyopod/.hermes/plugins/daedalus/workflows/__main__.py --workflow-root ~/.hermes/workflows/yoyopod dispatch-claude-review --json
+python3 ~/\.hermes/plugins/daedalus/workflows/__main__.py --workflow-root ~/.hermes/workflows/<owner>-<repo>-<workflow-type> status --json
+python3 ~/\.hermes/plugins/daedalus/workflows/__main__.py --workflow-root ~/.hermes/workflows/<owner>-<repo>-<workflow-type> tick --json
+python3 ~/\.hermes/plugins/daedalus/workflows/__main__.py --workflow-root ~/.hermes/workflows/<owner>-<repo>-<workflow-type> dispatch-implementation-turn --json
+python3 ~/\.hermes/plugins/daedalus/workflows/__main__.py --workflow-root ~/.hermes/workflows/<owner>-<repo>-<workflow-type> dispatch-claude-review --json
 ```
 
 ### Daedalus runtime direct
 ```bash
-python3 ~/\.hermes/workflows/yoyopod/.hermes/plugins/daedalus/runtime.py status --workflow-root ~/\.hermes/workflows/yoyopod --json
-python3 ~/\.hermes/workflows/yoyopod/.hermes/plugins/daedalus/runtime.py shadow-report --workflow-root ~/\.hermes/workflows/yoyopod --json
-python3 ~/\.hermes/workflows/yoyopod/.hermes/plugins/daedalus/runtime.py doctor --workflow-root ~/\.hermes/workflows/yoyopod --json
-python3 ~/\.hermes/workflows/yoyopod/.hermes/plugins/daedalus/runtime.py request-active-actions --workflow-root ~/\.hermes/workflows/yoyopod --lane-id lane:220 --json
+python3 ~/\.hermes/plugins/daedalus/runtime.py status --workflow-root ~/\.hermes/workflows/<owner>-<repo>-<workflow-type> --json
+python3 ~/\.hermes/plugins/daedalus/runtime.py shadow-report --workflow-root ~/\.hermes/workflows/<owner>-<repo>-<workflow-type> --json
+python3 ~/\.hermes/plugins/daedalus/runtime.py doctor --workflow-root ~/\.hermes/workflows/<owner>-<repo>-<workflow-type> --json
+python3 ~/\.hermes/plugins/daedalus/runtime.py request-active-actions --workflow-root ~/\.hermes/workflows/<owner>-<repo>-<workflow-type> --lane-id lane:220 --json
 ```
 
 ### Daedalus slash command inside Hermes
@@ -50,8 +50,8 @@ python3 ~/\.hermes/workflows/yoyopod/.hermes/plugins/daedalus/runtime.py request
 
 ### Active service
 ```bash
-systemctl --user status daedalus-active@yoyopod.service --no-pager
-journalctl --user -u daedalus-active@yoyopod.service -n 200 --no-pager
+systemctl --user status daedalus-active@<owner>-<repo>-<workflow-type>.service --no-pager
+journalctl --user -u daedalus-active@<owner>-<repo>-<workflow-type>.service -n 200 --no-pager
 ```
 
 ---
@@ -81,36 +81,36 @@ Use this order when debugging:
 ## 4. Key files
 
 ### Workflow root
-- `~/.hermes/workflows/yoyopod`
+- `~/.hermes/workflows/<owner>-<repo>-<workflow-type>`
 
 ### Main repo clone
-- `~/.hermes/workspaces/YoyoPod_Core`
+- `~/.hermes/workspaces/<repo-name>`
 
-### Workflow CLI (plugin-owned; replaces retired `scripts/yoyopod_workflow.py`)
-- `~/.hermes/workflows/yoyopod/.hermes/plugins/daedalus/workflows/__main__.py`
-  (always pass `--workflow-root ~/.hermes/workflows/yoyopod`)
+### Workflow CLI (plugin-owned; replaces the retired workflow-local wrapper)
+- `~/.hermes/plugins/daedalus/workflows/__main__.py`
+  (always pass `--workflow-root ~/.hermes/workflows/<owner>-<repo>-<workflow-type>`)
 
 ### Daedalus plugin
-- `~/.hermes/workflows/yoyopod/.hermes/plugins/daedalus/__init__.py`
-- `~/.hermes/workflows/yoyopod/.hermes/plugins/daedalus/tools.py`
-- `~/.hermes/workflows/yoyopod/.hermes/plugins/daedalus/runtime.py`
-- `~/.hermes/workflows/yoyopod/.hermes/plugins/daedalus/alerts.py`
+- `~/.hermes/plugins/daedalus/__init__.py`
+- `~/.hermes/plugins/daedalus/tools.py`
+- `~/.hermes/plugins/daedalus/runtime.py`
+- `~/.hermes/plugins/daedalus/alerts.py`
 
 ### Daedalus canonical state
-- `~/.hermes/workflows/yoyopod/state/daedalus/daedalus.db`
-- `~/.hermes/workflows/yoyopod/memory/daedalus-events.jsonl`
+- `~/.hermes/workflows/<owner>-<repo>-<workflow-type>/state/daedalus/daedalus.db`
+- `~/.hermes/workflows/<owner>-<repo>-<workflow-type>/memory/daedalus-events.jsonl`
 
 ### Wrapper projections
-- `~/.hermes/workflows/yoyopod/memory/yoyopod-workflow-status.json`
-- `~/.hermes/workflows/yoyopod/memory/yoyopod-workflow-health.json`
-- `~/.hermes/workflows/yoyopod/memory/yoyopod-workflow-audit.jsonl`
+- `~/.hermes/workflows/<owner>-<repo>-<workflow-type>/memory/workflow-status.json`
+- `~/.hermes/workflows/<owner>-<repo>-<workflow-type>/memory/workflow-health.json`
+- `~/.hermes/workflows/<owner>-<repo>-<workflow-type>/memory/workflow-audit.jsonl`
 
 ### Lane-local handoff artifacts
-- `/tmp/yoyopod-issue-<N>/.lane-state.json`
-- `/tmp/yoyopod-issue-<N>/.lane-memo.md`
+- `/tmp/issue-<N>/.lane-state.json`
+- `/tmp/issue-<N>/.lane-memo.md`
 
 ### Service unit
-- `~/.config/systemd/user/daedalus-active@yoyopod.service`
+- `~/.config/systemd/user/daedalus-active@<owner>-<repo>-<workflow-type>.service`
 
 ---
 
@@ -267,7 +267,7 @@ That’s expected. Daedalus speaks execution language.
 
 ### What is happening right now?
 ```bash
-python3 ~/\.hermes/workflows/yoyopod/.hermes/plugins/daedalus/workflows/__main__.py --workflow-root ~/.hermes/workflows/yoyopod status --json
+python3 ~/\.hermes/plugins/daedalus/workflows/__main__.py --workflow-root ~/.hermes/workflows/<owner>-<repo>-<workflow-type> status --json
 ```
 Check:
 - `health`
@@ -279,7 +279,7 @@ Check:
 
 ### Is Daedalus healthy?
 ```bash
-python3 ~/\.hermes/workflows/yoyopod/.hermes/plugins/daedalus/runtime.py doctor --workflow-root ~/\.hermes/workflows/yoyopod --json
+python3 ~/\.hermes/plugins/daedalus/runtime.py doctor --workflow-root ~/\.hermes/workflows/<owner>-<repo>-<workflow-type> --json
 ```
 Check:
 - runtime freshness
@@ -290,14 +290,14 @@ Check:
 
 ### Is the service actually alive?
 ```bash
-systemctl --user status daedalus-active@yoyopod.service --no-pager
-journalctl --user -u daedalus-active@yoyopod.service -n 200 --no-pager
+systemctl --user status daedalus-active@<owner>-<repo>-<workflow-type>.service --no-pager
+journalctl --user -u daedalus-active@<owner>-<repo>-<workflow-type>.service -n 200 --no-pager
 ```
 
 ### What active actions does Daedalus think exist?
 ```bash
-python3 ~/\.hermes/workflows/yoyopod/.hermes/plugins/daedalus/runtime.py request-active-actions \
-  --workflow-root ~/\.hermes/workflows/yoyopod \
+python3 ~/\.hermes/plugins/daedalus/runtime.py request-active-actions \
+  --workflow-root ~/\.hermes/workflows/<owner>-<repo>-<workflow-type> \
   --lane-id lane:220 --json
 ```
 
@@ -307,15 +307,15 @@ python3 ~/\.hermes/workflows/yoyopod/.hermes/plugins/daedalus/runtime.py request
 
 ### Show configured webhooks
 ```bash
-python3 ~/\.hermes/workflows/yoyopod/.hermes/plugins/daedalus/workflows/__main__.py \
-  --workflow-root ~/\.hermes/workflows/yoyopod status --json | jq '.webhooks'
+python3 ~/\.hermes/plugins/daedalus/workflows/__main__.py \
+  --workflow-root ~/\.hermes/workflows/<owner>-<repo>-<workflow-type> status --json | jq '.webhooks'
 ```
 
 ### Test a webhook manually
 ```bash
 # Trigger a test event to all configured webhooks
-python3 ~/\.hermes/workflows/yoyopod/.hermes/plugins/daedalus/workflows/__main__.py \
-  --workflow-root ~/\.hermes/workflows/yoyopod dispatch-test-webhook --event action=test
+python3 ~/\.hermes/plugins/daedalus/workflows/__main__.py \
+  --workflow-root ~/\.hermes/workflows/<owner>-<repo>-<workflow-type> dispatch-test-webhook --event action=test
 ```
 
 ---
@@ -324,8 +324,8 @@ python3 ~/\.hermes/workflows/yoyopod/.hermes/plugins/daedalus/workflows/__main__
 
 ### Show comment publisher state
 ```bash
-python3 ~/\.hermes/workflows/yoyopod/.hermes/plugins/daedalus/workflows/__main__.py \
-  --workflow-root ~/\.hermes/workflows/yoyopod status --json | jq '.comments'
+python3 ~/\.hermes/plugins/daedalus/workflows/__main__.py \
+  --workflow-root ~/\.hermes/workflows/<owner>-<repo>-<workflow-type> status --json | jq '.comments'
 ```
 
 ### Force a comment sync
@@ -347,7 +347,7 @@ Look for `config_reload_failed` in the event tail or doctor output.
 ### Force a config re-read
 ```bash
 # Touch the file; the next tick will pick it up.
-touch ~/.hermes/workflows/yoyopod/workflow.yaml
+touch ~/.hermes/workflows/<owner>-<repo>-<workflow-type>/workflow.yaml
 ```
 
 ### Show effective config (merged layers)
@@ -433,7 +433,7 @@ where lane_id='lane:220';
 
 ## 14. Current important policy knobs
 
-From `config/yoyopod-workflow.json`:
+From the legacy JSON workflow config:
 - coder default model: `gpt-5.3-codex-spark/high`
 - coder large-effort model: `gpt-5.3-codex`
 - coder escalation model: `gpt-5.4`

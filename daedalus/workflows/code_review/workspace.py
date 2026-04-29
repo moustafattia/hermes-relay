@@ -35,11 +35,7 @@ def _derive_lane_selection_cfg(yaml_cfg, *, active_lane_label):
 
 
 def _yaml_to_legacy_view(yaml_cfg: dict, workspace_root: "Path | None" = None) -> dict:
-    """Project the new YAML shape onto the old JSON key shape.
-
-    This is a temporary bridge that keeps the ~1600-LOC workspace factory
-    body untouched during Phase 4. Phase 6 cleanup can fold the bridge
-    into the factory once the shape is stable.
+    """Project workflow.yaml onto the internal workspace config shape.
 
     workspace_root must be supplied so that relative storage paths (e.g.
     ``memory/workflow-status.json``) are anchored to the workflow root dir
@@ -54,6 +50,7 @@ def _yaml_to_legacy_view(yaml_cfg: dict, workspace_root: "Path | None" = None) -
     gates = yaml_cfg.get("gates", {}) or {}
     storage = yaml_cfg.get("storage", {}) or {}
     escalation = yaml_cfg.get("escalation", {}) or {}
+    jobs_cfg = yaml_cfg.get("jobs", {}) or {}
 
     acpx = runtimes.get("acpx-codex", {}) or {}
     claude_cli = runtimes.get("claude-cli", {}) or {}
@@ -82,6 +79,16 @@ def _yaml_to_legacy_view(yaml_cfg: dict, workspace_root: "Path | None" = None) -
         return str(base.parent.parent / value) if local_path else value
 
     local_path = repo.get("local-path", "")
+    watchdog_job_name = str(jobs_cfg.get("watchdog") or "workflow-watchdog")
+    checker_job_name = str(jobs_cfg.get("checker") or "workflow-checker")
+    internal_review_job_name = str(
+        jobs_cfg.get("internal-review-runner") or "internal-review-runner"
+    )
+    milestone_notifier_job_name = str(
+        jobs_cfg.get("milestone-notifier") or "workflow-milestone-notifier"
+    )
+    core_job_names = list(jobs_cfg.get("core") or [watchdog_job_name])
+    support_job_names = list(jobs_cfg.get("support") or [milestone_notifier_job_name])
 
     return {
         "repoPath": local_path,
@@ -92,11 +99,15 @@ def _yaml_to_legacy_view(yaml_cfg: dict, workspace_root: "Path | None" = None) -
         "auditLogPath": _abs_or_join(storage.get("audit-log", "memory/workflow-audit.jsonl"), local_path),
         "activeLaneLabel": repo.get("active-lane-label", "active-lane"),
         "engineOwner": instance.get("engine-owner", "openclaw"),
-        "coreJobNames": [],
-        # Hardcoded to the one hermes-owned job name emitted by the schedules
-        # section; revisit when adding more hermes-scheduled jobs.
-        "hermesJobNames": ["yoyopod-workflow-milestone-telegram"],
-        "issueWatcherNameRegex": r"issue-\d+-watch",
+        "coreJobNames": core_job_names,
+        "hermesJobNames": support_job_names,
+        "issueWatcherNameRegex": jobs_cfg.get("issue-watcher-regex", r"issue-\d+-watch"),
+        "jobNames": {
+            "internalReviewRunner": internal_review_job_name,
+            "workflowChecker": checker_job_name,
+            "workflowWatchdog": watchdog_job_name,
+            "milestoneNotifier": milestone_notifier_job_name,
+        },
         "staleness": {
             "coreJobMissMultiplier": 2.5,
             "activeLaneWithoutPrMinutes": 45,
@@ -139,14 +150,10 @@ def _yaml_to_legacy_view(yaml_cfg: dict, workspace_root: "Path | None" = None) -
     }
 
 
-"""YoYoPod Core workspace.
+"""Workflow workspace.
 
-The :class:`Workspace` type is the canonical holder of YoYoPod-project-scoped
-config and I/O primitives. The legacy wrapper script at
-``~/.hermes/workflows/yoyopod/scripts/yoyopod_workflow.py`` used to host all of
-this inline; after the retirement pass it now simply instantiates a
-``Workspace`` and exposes its attributes as module-level globals for
-back-compat.
+The :class:`Workspace` type is the canonical holder of workflow-scoped config
+and I/O primitives.
 
 Two factories are provided:
 
@@ -155,13 +162,11 @@ Two factories are provided:
   ``orchestrator``, etc.) looks up workspace attributes by name, so any
   duck-typed accessor works.
 * :func:`load_workspace_from_config` — convenience wrapper that reads the
-  project workflow config (``config/workflow.yaml`` post-migration, falling
-  back to the legacy ``config/yoyopod-workflow.json``) and applies the same
-  derived constants the wrapper used to.
+  project workflow config from ``config/workflow.yaml`` and applies the same
+  derived constants the workspace uses internally.
 """
 
 
-DEFAULT_CONFIG_FILENAME = "config/yoyopod-workflow.json"
 DEFAULT_YAML_CONFIG_FILENAME = "config/workflow.yaml"
 
 
@@ -170,8 +175,7 @@ def _load_json(path: Path) -> dict[str, Any]:
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:
-    """Load a YAML mapping file. Imported lazily so workspaces that only ever
-    use the legacy JSON path don't pay the PyYAML import cost."""
+    """Load a YAML mapping file."""
     import yaml  # type: ignore[import]
 
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -277,7 +281,7 @@ def _build_adapter_module_loaders(workspace_root: Path) -> dict[str, Any]:
     """
     import importlib.util as _importlib_util
 
-    plugin_root = workspace_root / ".hermes" / "plugins" / "daedalus"
+    plugin_root = Path(__file__).resolve().parents[2]
     cache: dict[str, Any] = {}
 
     def _load_adapter_module(name: str):
@@ -426,16 +430,14 @@ def make_workspace(*, workspace_root: Path, config: dict[str, Any]) -> SimpleNam
     """Build the workspace accessor used by adapter CLI / orchestrator code.
 
     Returns a :class:`types.SimpleNamespace` bundling project-scoped config
-    constants and stdlib-backed I/O primitives. The wrapper script re-exports
-    every attribute at module level so historical ``from yoyopod_workflow
-    import …`` consumers still see the expected public surface.
+    constants and stdlib-backed I/O primitives for the configured workflow.
     """
 
     workspace_root = Path(workspace_root).resolve()
 
-    # Detect new YAML shape (has top-level `workflow:` + `runtimes:` + `agents:`)
-    # and bridge to the legacy JSON view for the existing body. Old-JSON callers
-    # pass through unchanged.
+    # Detect workflow.yaml shape (top-level `workflow:` + `runtimes:` +
+    # `agents:`) and project it onto the internal config view the existing
+    # implementation body still consumes.
     if "workflow" in config and "runtimes" in config and "agents" in config:
         yaml_cfg = config
         config = _yaml_to_legacy_view(config, workspace_root=workspace_root)
@@ -460,6 +462,7 @@ def make_workspace(*, workspace_root: Path, config: dict[str, Any]) -> SimpleNam
     core_job_names = list(config.get("coreJobNames", []))
     hermes_job_names = list(config.get("hermesJobNames", []))
     issue_watcher_re = re.compile(str(config.get("issueWatcherNameRegex", r"issue-\d+-watch")))
+    job_names = config.get("jobNames", {}) or {}
     issue_branch_re = re.compile(r"(?:^|/)issue-(\d+)(?:\b|[-_])")
     issue_worktree_re = re.compile(r"issue-(\d+)(?:\b|[-_])")
     severity_badge_re = re.compile(r"!\[P(\d+) Badge", re.IGNORECASE)
@@ -472,6 +475,10 @@ def make_workspace(*, workspace_root: Path, config: dict[str, Any]) -> SimpleNam
     review_cache = config.get("reviewCache", {}) or {}
     codex_cloud_cache_seconds = int(review_cache.get("codexCloudSeconds", 1800))
     claude_review_request_cooldown_seconds = int(review_cache.get("claudeReviewRequestCooldownSeconds", 1200))
+    internal_review_job_name = str(job_names.get("internalReviewRunner") or "internal-review-runner")
+    workflow_checker_job_name = str(job_names.get("workflowChecker") or "workflow-checker")
+    workflow_watchdog_job_name = str(job_names.get("workflowWatchdog") or "workflow-watchdog")
+    milestone_notifier_job_name = str(job_names.get("milestoneNotifier") or "workflow-milestone-notifier")
 
     session_policy = config.get("sessionPolicy", {}) or {}
     codex_model_default = str(session_policy.get("codexModel", "gpt-5.3-codex-spark/high"))
@@ -610,9 +617,10 @@ def make_workspace(*, workspace_root: Path, config: dict[str, Any]) -> SimpleNam
         # --- workspace globals ---
         WORKSPACE=workspace_root,
         CONFIG=config,
-        DEFAULT_CONFIG_PATH=workspace_root / DEFAULT_CONFIG_FILENAME,
+        DEFAULT_CONFIG_PATH=workspace_root / DEFAULT_YAML_CONFIG_FILENAME,
         SESSIONS_STATE_PATH=sessions_state_path,
         REPO_PATH=repo_path,
+        REPO_SLUG=_repo_slug,
         CRON_JOBS_PATH=cron_jobs_path,
         HERMES_CRON_JOBS_PATH=hermes_cron_jobs_path,
         LEDGER_PATH=ledger_path,
@@ -630,11 +638,11 @@ def make_workspace(*, workspace_root: Path, config: dict[str, Any]) -> SimpleNam
         MISS_MULTIPLIER=miss_multiplier,
         LANE_NO_PR_MINUTES=lane_no_pr_minutes,
         REVIEW_HEAD_MISSING_MINUTES=review_head_missing_minutes,
-        CLAUDE_REVIEW_JOB_NAME="yoyopod-claude-review-runner",
-        WORKFLOW_CHECKER_JOB_NAME="yoyopod-workflow-checker",
-        WORKFLOW_WATCHDOG_JOB_NAME="yoyopod-workflow-watchdog",
-        CODEX_WATCHDOG_JOB_NAME="yoyopod-workflow-watchdog",
-        TELEGRAM_JOB_NAME="yoyopod-workflow-milestone-telegram",
+        CLAUDE_REVIEW_JOB_NAME=internal_review_job_name,
+        WORKFLOW_CHECKER_JOB_NAME=workflow_checker_job_name,
+        WORKFLOW_WATCHDOG_JOB_NAME=workflow_watchdog_job_name,
+        CODEX_WATCHDOG_JOB_NAME=workflow_watchdog_job_name,
+        TELEGRAM_JOB_NAME=milestone_notifier_job_name,
         CLAUDE_TRIGGER_STATES={"under_review", "findings_open", "revalidating"},
         CODEX_CLOUD_CACHE_SECONDS=codex_cloud_cache_seconds,
         CLAUDE_REVIEW_REQUEST_COOLDOWN_SECONDS=claude_review_request_cooldown_seconds,
@@ -714,9 +722,7 @@ def make_workspace(*, workspace_root: Path, config: dict[str, Any]) -> SimpleNam
     _yaml_agents = (yaml_cfg or {}).get("agents", {}) or {}
     ext_reviewer_cfg = dict(_yaml_agents.get("external-reviewer") or {})
 
-    # Default repo-slug preserves current hardcoded behavior for unmodified configs.
-    if "repo-slug" not in ext_reviewer_cfg:
-        ext_reviewer_cfg["repo-slug"] = "moustafattia/YoyoPod_Core"
+    ext_reviewer_cfg["repo-slug"] = ext_reviewer_cfg.get("repo-slug") or _repo_slug
 
     reviewer_ctx = ReviewerContext(
         run_json=ns._run_json,
@@ -1317,7 +1323,7 @@ def _install_wrapper_adapter_shims(ns: SimpleNamespace) -> None:
 
     def _render_inter_review_agent_prompt(*, issue, worktree, lane_memo_path, lane_state_path, head_sha):
         lines = [
-            'You are reviewing the unpublished local lane head for YoyoPod_Core as a strict pre-publish code review gate.',
+            'You are reviewing the unpublished local lane head as a strict pre-publish code review gate.',
             f'Repository: {worktree}',
             f'Target local head SHA: {head_sha}',
             'Scope: local-prepublish only. Review the actual current local HEAD in this worktree.',
@@ -1717,7 +1723,7 @@ def _install_wrapper_adapter_shims(ns: SimpleNamespace) -> None:
             pr_number,
             run_fn=ns._run,
             cwd=ns.REPO_PATH,
-            repo_slug="moustafattia/YoyoPod_Core",
+            repo_slug=ns.REPO_SLUG,
         )
 
     def _resolve_review_thread(thread_id):
@@ -1880,7 +1886,7 @@ def _install_wrapper_adapter_shims(ns: SimpleNamespace) -> None:
             run_fn=ns._run,
             audit_fn=ns.audit,
             mark_pr_ready_for_review_fn=ns._mark_pr_ready_for_review,
-            repo_slug="moustafattia/YoyoPod_Core",
+            repo_slug=ns.REPO_SLUG,
             repo_path=ns.REPO_PATH,
         )
 
@@ -1903,7 +1909,7 @@ def _install_wrapper_adapter_shims(ns: SimpleNamespace) -> None:
             pick_next_lane_issue_fn=ns._pick_next_lane_issue,
             now_iso_fn=ns._now_iso,
             active_lane_label=ns.ACTIVE_LANE_LABEL,
-            repo_slug="moustafattia/YoyoPod_Core",
+            repo_slug=ns.REPO_SLUG,
             repo_path=ns.REPO_PATH,
         )
 
@@ -2087,34 +2093,16 @@ def load_workspace_from_config(
     workspace_root: Path,
     config_path: Path | None = None,
 ) -> SimpleNamespace:
-    """Convenience factory: read the workflow config and build a workspace.
-
-    Resolution order when ``config_path`` is not supplied:
-
-    1. ``config/workflow.yaml`` — canonical post-migration source of truth.
-       Parsed as YAML; the YAML→legacy-view bridge in :func:`make_workspace`
-       projects it onto the JSON-shaped config the body still consumes.
-    2. ``config/yoyopod-workflow.json`` — legacy unmigrated workspaces only.
-       Read as JSON.
-
-    When ``config_path`` is supplied explicitly, the suffix decides the
-    parser: ``.yaml``/``.yml`` → YAML, otherwise JSON. This preserves
-    back-compat with callers that pass an explicit JSON path.
-    """
+    """Convenience factory: read ``config/workflow.yaml`` and build a workspace."""
     workspace_root = Path(workspace_root)
     if config_path is not None:
         path = Path(config_path)
-        if path.suffix.lower() in {".yaml", ".yml"}:
-            config = _load_yaml(path)
-        else:
-            config = _load_json(path)
+        if path.suffix.lower() not in {".yaml", ".yml"}:
+            raise ValueError(f"workflow config must be YAML: {path}")
+        config = _load_yaml(path)
         return make_workspace(workspace_root=workspace_root, config=config)
 
     yaml_path = workspace_root / DEFAULT_YAML_CONFIG_FILENAME
-    if yaml_path.exists():
-        return make_workspace(
-            workspace_root=workspace_root, config=_load_yaml(yaml_path)
-        )
-
-    json_path = workspace_root / DEFAULT_CONFIG_FILENAME
-    return make_workspace(workspace_root=workspace_root, config=_load_json(json_path))
+    return make_workspace(
+        workspace_root=workspace_root, config=_load_yaml(yaml_path)
+    )

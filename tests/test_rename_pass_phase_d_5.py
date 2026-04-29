@@ -118,11 +118,14 @@ def test_get_lane_state_review_field_returns_none_for_unknown_key():
     assert get_lane_state_review_field({"x": 1}, "made-up") is None
 
 
-def test_existing_yoyopod_ledger_lane_state_migration(tmp_path):
+def test_existing_installed_workflow_ledger_lane_state_migration(tmp_path):
     from workflows.code_review.migrations import migrate_persisted_ledger
-    src = Path(os.path.expanduser("~/.hermes/workflows/yoyopod/memory/yoyopod-workflow-status.json"))
+    plugin_dir = Path.home() / ".hermes" / "plugins" / "daedalus"
+    if not plugin_dir.exists():
+        pytest.skip("installed workflow plugin not present")
+    src = plugin_dir.resolve().parents[2] / "memory" / "workflow-status.json"
     if not src.exists():
-        pytest.skip("yoyopod ledger not present")
+        pytest.skip("installed workflow ledger not present")
     dst = tmp_path / "l.json"
     dst.write_text(src.read_text())
     migrate_persisted_ledger(dst)

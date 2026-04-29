@@ -70,7 +70,7 @@ def test_status_no_info_loss():
     fmt = _fmt()
     result = {
         "runtime_status": "running", "current_mode": "active",
-        "active_orchestrator_instance_id": "daedalus-active-yoyopod",
+        "active_orchestrator_instance_id": "daedalus-active-workflow-example",
         "schema_version": 3, "lane_count": 14,
         "db_path": "/path/to/daedalus.db",
         "event_log_path": "/path/to/daedalus-events.jsonl",
@@ -110,7 +110,7 @@ def test_doctor_no_info_loss():
 def test_service_status_no_info_loss():
     fmt = _fmt()
     result = {
-        "service_name": "daedalus-active@yoyopod.service",
+        "service_name": "daedalus-active@workflow-example.service",
         "service_mode": "active",
         "installed": True, "enabled": True, "active": True,
         "unit_path": "/path/unit.service",
@@ -128,7 +128,7 @@ def test_shadow_report_no_info_loss():
     result = {
         "runtime": {
             "runtime_status": "running", "current_mode": "active",
-            "active_orchestrator_instance_id": "daedalus-active-yoyopod",
+            "active_orchestrator_instance_id": "daedalus-active-workflow-example",
             "latest_heartbeat_at": "2026-04-26T22:43:01Z",
         },
         "heartbeat": {

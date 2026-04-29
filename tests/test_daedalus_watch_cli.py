@@ -20,7 +20,7 @@ def load_module(module_name: str, relative_path: str):
 
 def test_cmd_watch_one_shot_when_not_tty(tmp_path, capsys):
     watch = load_module("daedalus_watch_cli_test", "watch.py")
-    root = tmp_path / "yoyopod_core"
+    root = tmp_path / "workflow_example"
     (root / "runtime" / "memory").mkdir(parents=True)
     (root / "runtime" / "state" / "daedalus").mkdir(parents=True)
     (root / "config").mkdir()
@@ -40,7 +40,7 @@ def test_cmd_watch_one_shot_when_not_tty(tmp_path, capsys):
 
 def test_cmd_watch_with_once_flag_renders_one_frame(tmp_path):
     watch = load_module("daedalus_watch_cli_test", "watch.py")
-    root = tmp_path / "yoyopod_core"
+    root = tmp_path / "workflow_example"
     (root / "runtime" / "memory").mkdir(parents=True)
     (root / "runtime" / "state" / "daedalus").mkdir(parents=True)
     (root / "config").mkdir()

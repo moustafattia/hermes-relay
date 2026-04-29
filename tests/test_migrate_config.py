@@ -12,15 +12,15 @@ MIGRATE_SCRIPT = REPO_ROOT / "scripts" / "migrate_config.py"
 
 def _sample_old_json():
     return {
-        "repoPath": "/home/radxa/.hermes/workspaces/YoyoPod_Core",
-        "cronJobsPath": "/home/radxa/.hermes/workflows/yoyopod/archive/openclaw-cron-jobs.json",
-        "ledgerPath": "/home/radxa/.hermes/workflows/yoyopod/memory/yoyopod-workflow-status.json",
-        "healthPath": "/home/radxa/.hermes/workflows/yoyopod/memory/yoyopod-workflow-health.json",
-        "auditLogPath": "/home/radxa/.hermes/workflows/yoyopod/memory/yoyopod-workflow-audit.jsonl",
+        "repoPath": "/home/radxa/.hermes/workspaces/example-repo",
+        "cronJobsPath": "/home/radxa/.hermes/workflows/workflow-example/archive/openclaw-cron-jobs.json",
+        "ledgerPath": "/home/radxa/.hermes/workflows/workflow-example/memory/workflow-status.json",
+        "healthPath": "/home/radxa/.hermes/workflows/workflow-example/memory/workflow-health.json",
+        "auditLogPath": "/home/radxa/.hermes/workflows/workflow-example/memory/workflow-audit.jsonl",
         "activeLaneLabel": "active-lane",
         "engineOwner": "hermes",
         "coreJobNames": [],
-        "hermesJobNames": ["yoyopod-workflow-milestone-telegram"],
+        "hermesJobNames": ["workflow-milestone-notifier"],
         "issueWatcherNameRegex": "issue-\\d+-watch",
         "staleness": {
             "coreJobMissMultiplier": 2.5,
@@ -60,7 +60,7 @@ def _sample_old_json():
 
 
 def test_migrate_emits_valid_workflow_yaml(tmp_path):
-    json_path = tmp_path / "yoyopod-workflow.json"
+    json_path = tmp_path / "legacy-workflow.json"
     json_path.write_text(json.dumps(_sample_old_json()), encoding="utf-8")
     yaml_path = tmp_path / "workflow.yaml"
 
@@ -82,18 +82,18 @@ def test_migrate_emits_valid_workflow_yaml(tmp_path):
     assert cfg["workflow"] == "code-review"
     assert cfg["schema-version"] == 1
     assert cfg["instance"]["engine-owner"] == "hermes"
-    assert cfg["repository"]["local-path"] == "/home/radxa/.hermes/workspaces/YoyoPod_Core"
+    assert cfg["repository"]["local-path"] == "/home/radxa/.hermes/workspaces/example-repo"
     assert cfg["runtimes"]["acpx-codex"]["session-idle-freshness-seconds"] == 900
     assert cfg["runtimes"]["claude-cli"]["max-turns-per-invocation"] == 24
     assert cfg["agents"]["coder"]["default"]["model"] == "gpt-5.3-codex-spark/high"
     assert cfg["agents"]["internal-reviewer"]["model"] == "claude-sonnet-4-6"
     assert cfg["agents"]["external-reviewer"]["provider"] == "codex-cloud"
-    # YoyoPod-specific slug inference (the migrator recognizes the YoyoPod_Core path)
-    assert cfg["repository"]["github-slug"] == "moustafattia/YoyoPod_Core"
+    assert cfg["repository"]["github-slug"] == "FIXME/FIXME"
+    assert cfg["schedules"]["milestone-notifier"]["delivery"]["chat-id"] == "FIXME_CHAT_ID"
 
 
 def test_migrate_refuses_to_overwrite_existing_yaml(tmp_path):
-    json_path = tmp_path / "yoyopod-workflow.json"
+    json_path = tmp_path / "legacy-workflow.json"
     json_path.write_text(json.dumps(_sample_old_json()), encoding="utf-8")
     yaml_path = tmp_path / "workflow.yaml"
     yaml_path.write_text("pre-existing: true\n", encoding="utf-8")

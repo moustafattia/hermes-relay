@@ -10,7 +10,7 @@ from typing import Any, Callable
 from workflows.code_review.migrations import get_lane_state_review_field, get_review
 
 
-"""YoYoPod Core review-policy helpers.
+"""Code-review workflow review-policy helpers.
 
 This slice extracts repair-handoff gating rules from the legacy wrapper so the
 adapter workflow can own the remaining review-driven nextAction branches.

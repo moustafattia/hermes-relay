@@ -12,21 +12,23 @@ from pathlib import Path
 from typing import Any
 
 from workflows.code_review.paths import (
-    resolve_default_workflow_root as resolve_yoyopod_core_workflow_root,
-    yoyopod_cli_argv,
+    derive_workflow_instance_name,
+    plugin_runtime_path,
+    project_key_for_workflow_root,
+    resolve_default_workflow_root as resolve_workflow_root_default,
+    workflow_cli_argv,
 )
-from workflows.code_review.status import build_status as build_yoyopod_core_status
+from workflows.code_review.status import build_status as build_workflow_status
 
 PLUGIN_DIR = Path(__file__).resolve().parent
 DEFAULT_WORKFLOW_ROOT_ENV_VARS = ("DAEDALUS_WORKFLOW_ROOT",)
 
 
 def resolve_default_workflow_root() -> Path:
-    return resolve_yoyopod_core_workflow_root(plugin_dir=PLUGIN_DIR)
+    return resolve_workflow_root_default(plugin_dir=PLUGIN_DIR)
 
 
 DEFAULT_WORKFLOW_ROOT = resolve_default_workflow_root()
-DEFAULT_PROJECT_KEY = "yoyopod"
 DEFAULT_INSTANCE_ID = "daedalus-plugin"
 
 DAEDALUS_TEMPLATE_UNIT_FILENAMES = {
@@ -75,7 +77,7 @@ def _load_daedalus_module(workflow_root: Path):
 
 
 def _build_project_status(workflow_root: Path) -> dict[str, Any]:
-    return build_yoyopod_core_status(workflow_root)
+    return build_workflow_status(workflow_root)
 
 
 def _compatibility_pairs() -> set[tuple[str | None, str | None]]:
@@ -117,7 +119,6 @@ def _parse_issue_number_from_text(value: Any) -> int | None:
         r"issue[-_/](\d+)",
         r"/issues/(\d+)",
         r"lane[-_/](\d+)",
-        r"yoyopod-issue-(\d+)",
     ]
     for pattern in patterns:
         match = re.search(pattern, value, re.IGNORECASE)
@@ -189,7 +190,8 @@ def _service_instance_name(*, service_mode: str = "shadow", workspace: str) -> s
 
 
 def _expected_plugin_runtime_path(workflow_root: Path) -> Path:
-    return workflow_root / ".hermes" / "plugins" / "daedalus" / "runtime.py"
+    del workflow_root
+    return plugin_runtime_path(plugin_dir=PLUGIN_DIR)
 
 
 
@@ -283,7 +285,7 @@ def install_supervised_service(
     plugin_runtime_path = _expected_plugin_runtime_path(workflow_root)
     if not plugin_runtime_path.exists():
         raise DaedalusCommandError(
-            f"Daedalus plugin runtime not found at {plugin_runtime_path}; install/copy the plugin payload into the workflow root before installing the service"
+            f"Daedalus plugin runtime not found at {plugin_runtime_path}; install the plugin into ~/.hermes/plugins/daedalus before installing the service"
         )
     workspace = workflow_root.name
     resolved_service_name = _resolve_service_name(
@@ -1004,6 +1006,130 @@ def _lazy_cmd_watch(args, parser):
     return cmd_watch(args, parser)
 
 
+def _workflow_template_path(workflow_name: str) -> Path:
+    templates = {
+        "code-review": PLUGIN_DIR / "workflows" / "code_review" / "workflow.template.yaml",
+    }
+    path = templates.get(workflow_name)
+    if path is None:
+        raise DaedalusCommandError(f"no bundled workflow template for {workflow_name!r}")
+    return path
+
+
+def scaffold_workflow_root(
+    *,
+    workflow_root: Path,
+    workflow_name: str,
+    repo_path: Path | None,
+    github_slug: str,
+    active_lane_label: str,
+    engine_owner: str,
+    force: bool,
+) -> dict[str, Any]:
+    import yaml  # type: ignore[import]
+
+    root = workflow_root.expanduser().resolve()
+    config_path = root / "config" / "workflow.yaml"
+    if config_path.exists() and not force:
+        raise DaedalusCommandError(
+            f"refusing to overwrite existing config: {config_path} (pass --force to replace it)"
+        )
+
+    template_path = _workflow_template_path(workflow_name)
+    config = yaml.safe_load(template_path.read_text(encoding="utf-8"))
+    if not isinstance(config, dict):
+        raise DaedalusCommandError(f"workflow template must be a YAML mapping: {template_path}")
+
+    resolved_github_slug = github_slug.strip()
+    if not resolved_github_slug:
+        raise DaedalusCommandError("--github-slug cannot be blank")
+    try:
+        resolved_instance_name = derive_workflow_instance_name(
+            github_slug=resolved_github_slug,
+            workflow_name=workflow_name,
+        )
+    except ValueError as exc:
+        raise DaedalusCommandError(f"--github-slug {resolved_github_slug!r} is invalid: {exc}") from exc
+    if root.name != resolved_instance_name:
+        expected_root = root.parent / resolved_instance_name
+        raise DaedalusCommandError(
+            "workflow root directory name must follow <owner>-<repo>-<workflow-type>: "
+            f"expected {expected_root} for github-slug={resolved_github_slug!r} "
+            f"and workflow={workflow_name!r}"
+        )
+
+    resolved_repo_path = repo_path.expanduser() if repo_path is not None else (root / "workspace" / "repo")
+    if not resolved_repo_path.is_absolute():
+        resolved_repo_path = root / resolved_repo_path
+    resolved_repo_path = resolved_repo_path.resolve()
+
+    config["workflow"] = workflow_name
+    instance_cfg = config.setdefault("instance", {})
+    repository_cfg = config.setdefault("repository", {})
+    triggers_cfg = config.setdefault("triggers", {})
+    lane_selector_cfg = triggers_cfg.setdefault("lane-selector", {})
+
+    instance_cfg["name"] = resolved_instance_name
+    instance_cfg["engine-owner"] = engine_owner
+    repository_cfg["local-path"] = str(resolved_repo_path)
+    repository_cfg["github-slug"] = resolved_github_slug
+    repository_cfg["active-lane-label"] = active_lane_label
+    lane_selector_cfg["label"] = active_lane_label
+
+    created_dirs = [
+        root / "config",
+        root / "memory",
+        root / "state" / "sessions",
+        root / "runtime" / "logs",
+        root / "runtime" / "memory",
+        root / "runtime" / "state" / "daedalus",
+        root / "workspace",
+        resolved_repo_path,
+    ]
+    for path in created_dirs:
+        path.mkdir(parents=True, exist_ok=True)
+
+    config_path.write_text(
+        yaml.safe_dump(config, sort_keys=False),
+        encoding="utf-8",
+    )
+    return {
+        "ok": True,
+        "workflow_root": str(root),
+        "config_path": str(config_path),
+        "workflow": workflow_name,
+        "instance_name": resolved_instance_name,
+        "engine_owner": engine_owner,
+        "repo_path": str(resolved_repo_path),
+        "github_slug": resolved_github_slug,
+        "active_lane_label": active_lane_label,
+        "force": force,
+    }
+
+
+def cmd_scaffold_workflow(args, parser) -> str:
+    result = scaffold_workflow_root(
+        workflow_root=Path(args.workflow_root),
+        workflow_name=args.workflow,
+        repo_path=Path(args.repo_path) if args.repo_path else None,
+        github_slug=args.github_slug,
+        active_lane_label=args.active_lane_label,
+        engine_owner=args.engine_owner,
+        force=args.force,
+    )
+    if getattr(args, "json", False):
+        return json.dumps(result, indent=2, sort_keys=True)
+    lines = [
+        f"scaffolded workflow root: {result['workflow_root']}",
+        f"config: {result['config_path']}",
+        f"workflow: {result['workflow']}",
+        f"instance: {result['instance_name']}",
+        f"repo-path: {result['repo_path']}",
+        f"github-slug: {result['github_slug']}",
+    ]
+    return "\n".join(lines)
+
+
 def cmd_migrate_filesystem(args, parser) -> str:
     """Run the filesystem migrator for the given workflow root.
 
@@ -1032,23 +1158,26 @@ def cmd_migrate_filesystem(args, parser) -> str:
 
 
 def cmd_migrate_systemd(args, parser) -> str:
-    """Migrate relay-era systemd units to daedalus template units.
+    """Migrate relay-era systemd units to Daedalus template units.
 
-    Operator-explicit. Removes old yoyopod-relay-{shadow,active}.service
-    unit files (tolerant of missing units), installs new daedalus
+    Operator-explicit. Removes old workflow-specific relay unit files
+    (tolerant of missing units), installs new daedalus
     template units, runs daemon-reload.
     """
     import subprocess
 
     workflow_root = args.workflow_root.expanduser().resolve()
-    workspace = workflow_root.name  # last path segment, e.g. "yoyopod"
+    workspace = workflow_root.name
     systemd_dir = _systemd_user_dir()
     systemd_dir.mkdir(parents=True, exist_ok=True)
 
     actions: list[str] = []
 
     # 1. Stop + disable old units (tolerant of missing units)
-    for old_name in ("yoyopod-relay-active.service", "yoyopod-relay-shadow.service"):
+    for old_name in (
+        f"{workspace}-relay-active.service",
+        f"{workspace}-relay-shadow.service",
+    ):
         old_path = systemd_dir / old_name
         if old_path.exists():
             subprocess.run(
@@ -1171,13 +1300,13 @@ def configure_subcommands(parser: argparse.ArgumentParser) -> argparse.ArgumentP
 
     init_cmd = sub.add_parser("init", help="Initialize Daedalus DB and filesystem paths.")
     init_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
-    init_cmd.add_argument("--project-key", default=DEFAULT_PROJECT_KEY)
+    init_cmd.add_argument("--project-key")
     init_cmd.add_argument("--json", action="store_true")
     init_cmd.set_defaults(func=run_cli_command)
 
     start_cmd = sub.add_parser("start", help="Bootstrap Daedalus runtime and acquire runtime lease.")
     start_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
-    start_cmd.add_argument("--project-key", default=DEFAULT_PROJECT_KEY)
+    start_cmd.add_argument("--project-key")
     start_cmd.add_argument("--instance-id", default=DEFAULT_INSTANCE_ID)
     start_cmd.add_argument("--mode", default="shadow", choices=["shadow", "active", "maintenance"])
     start_cmd.add_argument("--json", action="store_true")
@@ -1220,7 +1349,7 @@ def configure_subcommands(parser: argparse.ArgumentParser) -> argparse.ArgumentP
 
     service_install_cmd = sub.add_parser("service-install", help="Install the supervised Daedalus systemd user service.")
     service_install_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
-    service_install_cmd.add_argument("--project-key", default=DEFAULT_PROJECT_KEY)
+    service_install_cmd.add_argument("--project-key")
     service_install_cmd.add_argument("--instance-id")
     service_install_cmd.add_argument("--interval-seconds", type=int, default=30)
     service_install_cmd.add_argument("--service-mode", choices=sorted(SERVICE_PROFILES), default="shadow")
@@ -1291,7 +1420,7 @@ def configure_subcommands(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     service_logs_cmd.add_argument("--json", action="store_true")
     service_logs_cmd.set_defaults(func=run_cli_command)
 
-    ingest_cmd = sub.add_parser("ingest-live", help="Ingest current legacy YoYoPod workflow status into Daedalus shadow state.")
+    ingest_cmd = sub.add_parser("ingest-live", help="Ingest current workflow status into Daedalus shadow state.")
     ingest_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
     ingest_cmd.add_argument("--json", action="store_true")
     ingest_cmd.set_defaults(func=run_cli_command)
@@ -1311,7 +1440,7 @@ def configure_subcommands(parser: argparse.ArgumentParser) -> argparse.ArgumentP
 
     run_cmd = sub.add_parser("run-shadow", help="Run the shadow-mode loop shell for one or more iterations.")
     run_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
-    run_cmd.add_argument("--project-key", default=DEFAULT_PROJECT_KEY)
+    run_cmd.add_argument("--project-key")
     run_cmd.add_argument("--instance-id", default=DEFAULT_INSTANCE_ID)
     run_cmd.add_argument("--interval-seconds", type=int, default=30)
     run_cmd.add_argument("--max-iterations", type=int)
@@ -1343,7 +1472,7 @@ def configure_subcommands(parser: argparse.ArgumentParser) -> argparse.ArgumentP
 
     run_active_cmd = sub.add_parser("run-active", help="Run the guarded active-mode loop shell for one or more iterations.")
     run_active_cmd.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
-    run_active_cmd.add_argument("--project-key", default=DEFAULT_PROJECT_KEY)
+    run_active_cmd.add_argument("--project-key")
     run_active_cmd.add_argument("--instance-id", default=DEFAULT_INSTANCE_ID)
     run_active_cmd.add_argument("--interval-seconds", type=int, default=30)
     run_active_cmd.add_argument("--max-iterations", type=int)
@@ -1417,6 +1546,25 @@ def configure_subcommands(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     get_obs_cmd.add_argument("--workflow", required=True)
     get_obs_cmd.set_defaults(handler=cmd_get_observability, func=run_cli_command)
 
+    scaffold_cmd = sub.add_parser(
+        "scaffold-workflow",
+        help="Create a new workflow root and starter config/workflow.yaml.",
+    )
+    scaffold_cmd.add_argument(
+        "--workflow-root",
+        type=Path,
+        required=True,
+        help="Workflow root to create. Directory name must be <owner>-<repo>-<workflow-type>.",
+    )
+    scaffold_cmd.add_argument("--workflow", default="code-review", choices=["code-review"])
+    scaffold_cmd.add_argument("--repo-path", type=Path)
+    scaffold_cmd.add_argument("--github-slug", required=True)
+    scaffold_cmd.add_argument("--active-lane-label", default="active-lane")
+    scaffold_cmd.add_argument("--engine-owner", default="hermes", choices=["hermes", "openclaw"])
+    scaffold_cmd.add_argument("--force", action="store_true")
+    scaffold_cmd.add_argument("--json", action="store_true")
+    scaffold_cmd.set_defaults(handler=cmd_scaffold_workflow, func=run_cli_command)
+
     return parser
 
 
@@ -1426,8 +1574,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _run_wrapper_json_command(*, workflow_root: Path, command: str) -> dict[str, Any]:
-    """Run a YoYoPod workflow CLI command via the plugin-side entrypoint."""
-    argv = yoyopod_cli_argv(workflow_root, *shlex.split(command))
+    """Run a workflow CLI command via the plugin-side entrypoint."""
+    argv = workflow_cli_argv(workflow_root, *shlex.split(command))
     completed = subprocess.run(
         argv,
         capture_output=True,
@@ -1442,8 +1590,7 @@ def _run_wrapper_json_command(*, workflow_root: Path, command: str) -> dict[str,
     return json.loads(completed.stdout)
 
 
-def _record_operator_command_event(*, workflow_root: Path, args: argparse.Namespace) -> None:
-    daedalus = _load_daedalus_module(workflow_root)
+def _record_operator_command_event(*, workflow_root: Path, args: argparse.Namespace, daedalus: Any) -> None:
     now_iso = daedalus._now_iso()
     arguments_json = {}
     for key, value in vars(args).items():
@@ -1464,7 +1611,7 @@ def _record_operator_command_event(*, workflow_root: Path, args: argparse.Namesp
             "event_version": 1,
             "created_at": now_iso,
             "producer": "Workflow_Orchestrator",
-            "project_key": "yoyopod",
+            "project_key": daedalus._project_key_for(workflow_root),
             "lane_id": None,
             "issue_number": None,
             "head_sha": None,
@@ -1479,6 +1626,12 @@ def _record_operator_command_event(*, workflow_root: Path, args: argparse.Namesp
             },
         },
     )
+
+
+def _resolved_project_key(*, daedalus: Any, workflow_root: Path, project_key: str | None) -> str:
+    if project_key:
+        return project_key
+    return daedalus._project_key_for(workflow_root)
 
 
 def _resolve_format(format_arg: str | None, json_flag: bool | None) -> str:
@@ -1496,17 +1649,28 @@ def _resolve_format(format_arg: str | None, json_flag: bool | None) -> str:
 
 def execute_namespace(args: argparse.Namespace) -> dict[str, Any]:
     workflow_root = Path(args.workflow_root).resolve() if hasattr(args, "workflow_root") else None
-    if workflow_root is not None and getattr(args, "daedalus_command", None):
-        _record_operator_command_event(workflow_root=workflow_root, args=args)
     daedalus = _load_daedalus_module(workflow_root) if workflow_root is not None else None
+    if workflow_root is not None and daedalus is not None and getattr(args, "daedalus_command", None):
+        _record_operator_command_event(workflow_root=workflow_root, args=args, daedalus=daedalus)
+    command = getattr(args, "daedalus_command", None)
+    project_key_commands = {"init", "start", "service-install", "run-shadow", "run-active"}
+    resolved_project_key = (
+        _resolved_project_key(
+            daedalus=daedalus,
+            workflow_root=workflow_root,
+            project_key=getattr(args, "project_key", None),
+        )
+        if workflow_root is not None and daedalus is not None and command in project_key_commands
+        else None
+    )
     paths = daedalus._runtime_paths(workflow_root) if daedalus is not None else None
 
     if args.daedalus_command == "init":
-        return daedalus.init_daedalus_db(workflow_root=workflow_root, project_key=args.project_key)
+        return daedalus.init_daedalus_db(workflow_root=workflow_root, project_key=resolved_project_key)
     if args.daedalus_command == "start":
         return daedalus.bootstrap_runtime(
             workflow_root=workflow_root,
-            project_key=args.project_key,
+            project_key=resolved_project_key,
             instance_id=args.instance_id,
             mode=args.mode,
         )
@@ -1525,7 +1689,7 @@ def execute_namespace(args: argparse.Namespace) -> dict[str, Any]:
     if args.daedalus_command == "service-install":
         return install_supervised_service(
             workflow_root=workflow_root,
-            project_key=args.project_key,
+            project_key=resolved_project_key,
             instance_id=args.instance_id,
             interval_seconds=args.interval_seconds,
             service_name=args.service_name,
@@ -1601,7 +1765,7 @@ def execute_namespace(args: argparse.Namespace) -> dict[str, Any]:
     if args.daedalus_command == "run-shadow":
         return daedalus.run_shadow_loop(
             workflow_root=workflow_root,
-            project_key=args.project_key,
+            project_key=resolved_project_key,
             instance_id=args.instance_id,
             interval_seconds=args.interval_seconds,
             max_iterations=args.max_iterations,
@@ -1631,7 +1795,7 @@ def execute_namespace(args: argparse.Namespace) -> dict[str, Any]:
     if args.daedalus_command == "run-active":
         return daedalus.run_active_loop(
             workflow_root=workflow_root,
-            project_key=args.project_key,
+            project_key=resolved_project_key,
             instance_id=args.instance_id,
             interval_seconds=args.interval_seconds,
             max_iterations=args.max_iterations,
@@ -1850,6 +2014,8 @@ def execute_raw_args(raw_args: str) -> str:
             return cmd_set_observability(args, parser)
         if args.daedalus_command == "get-observability":
             return cmd_get_observability(args, parser)
+        if args.daedalus_command == "scaffold-workflow":
+            return cmd_scaffold_workflow(args, parser)
         result = execute_namespace(args)
         fmt = _resolve_format(getattr(args, "format", None), getattr(args, "json", False))
         return render_result(args.daedalus_command, result, output_format=fmt)
@@ -1875,6 +2041,7 @@ def run_cli_command(args: argparse.Namespace) -> None:
         "watch",
         "set-observability",
         "get-observability",
+        "scaffold-workflow",
     }
     if getattr(args, "daedalus_command", None) in string_returning:
         handler = getattr(args, "handler", None)

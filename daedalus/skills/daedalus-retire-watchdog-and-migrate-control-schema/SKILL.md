@@ -70,12 +70,12 @@ Steps
 8. Verify in this order.
    - `pytest -q` in `~/WS/daedalus`
    - Run live gate check:
-     - `python3 runtime.py active-gate-status --workflow-root ~/.hermes/workflows/yoyopod --json`
+     - `python3 runtime.py active-gate-status --workflow-root ~/.hermes/workflows/<workflow-name> --json`
    - Inspect live DB schema and tables:
      - `SELECT name FROM sqlite_master WHERE type='table' ORDER BY name`
      - `PRAGMA table_info(execution_controls)`
    - Optionally rewrite the live control row through the runtime command after migration:
-     - `python3 runtime.py set-active-execution --workflow-root ~/.hermes/workflows/yoyopod --enabled true --json`
+     - `python3 runtime.py set-active-execution --workflow-root ~/.hermes/workflows/<workflow-name> --enabled true --json`
    - Verify repo is clean of legacy language:
      - search `.py` and `.md` again for the legacy terms above
 

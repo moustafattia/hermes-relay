@@ -51,12 +51,11 @@ class RefreshController:
         # Codex P1 on PR #22: invoke via the plugin entrypoint, not
         # ``-m workflows.code_review``. The ``-m`` form requires the
         # child to import ``workflows`` from its sys.path, which only
-        # works in the editable-source dev layout. In a production
-        # script-form deployment the package lives under
-        # ``<workflow_root>/.hermes/plugins/daedalus/workflows/`` and
+        # works in the editable-source dev layout. In installed
+        # deployments the package lives under the global plugin root and
         # the import path adjustment is done by ``__main__.py`` in-process.
-        # ``workflow_cli_argv`` returns the plugin entrypoint path so
-        # the subprocess works in both source and installed layouts.
+        # ``workflow_cli_argv`` returns that plugin entrypoint path so the
+        # subprocess works in both source and installed layouts.
         argv = workflow_cli_argv(
             self._workflow_root,
             "--workflow-root",

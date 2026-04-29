@@ -28,13 +28,13 @@ ANSI color is auto-detected via `sys.stdout.isatty()` and respects the
 #### Example: `/daedalus status`
 
 ```
-Daedalus runtime — yoyopod
+Daedalus runtime — <owner>-<repo>-<workflow-type>
   state    running (active mode)
-  owner    daedalus-active-yoyopod
+  owner    daedalus-active-<owner>-<repo>-<workflow-type>
   schema   v3
   paths
-    db          ~/.hermes/workflows/yoyopod/runtime/state/daedalus/daedalus.db
-    events      ~/.hermes/workflows/yoyopod/runtime/memory/daedalus-events.jsonl
+    db          ~/.hermes/workflows/<owner>-<repo>-<workflow-type>/runtime/state/daedalus/daedalus.db
+    events      ~/.hermes/workflows/<owner>-<repo>-<workflow-type>/runtime/memory/daedalus-events.jsonl
   heartbeat
     last        22:43:01 UTC (17s ago)
   lanes
@@ -82,7 +82,7 @@ Daedalus doctor
 Daedalus shadow-report
   runtime
     state           running (active mode)
-    owner           daedalus-active-yoyopod
+  owner           daedalus-active-<owner>-<repo>-<workflow-type>
     heartbeat       22:43:01 UTC (17s ago)
     lease expires   22:44:00 UTC (in 42s)
   ownership
@@ -109,7 +109,7 @@ Daedalus shadow-report
 
 ```
 Daedalus service
-  service  daedalus-active@yoyopod.service
+  service  daedalus-active@<owner>-<repo>-<workflow-type>.service
   mode     active
   install state
     ✓ installed   yes
@@ -137,6 +137,7 @@ Daedalus service
 | Command | What it does |
 |---|---|
 | `/daedalus init` | Init/migrate the runtime DB (idempotent) |
+| `/daedalus scaffold-workflow` | Create a new workflow root named `<owner>-<repo>-<workflow-type>` with a starter `config/workflow.yaml` |
 | `/daedalus ingest-live` | Pull workflow CLI status into the ledger |
 | `/daedalus heartbeat` | Refresh the runtime lease |
 | `/daedalus request-active-actions` | Inspect what *would* be dispatched on the next tick |

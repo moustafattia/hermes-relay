@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Daedalus Architecture Diagram](assets/daedalus-architecture-diagram.svg)
+![Daedalus Architecture Diagram](assets/daedalus-architecture-diagram.png)
 
 > **Daedalus is a durable orchestration runtime that wraps an SDLC workflow brain with leases, canonical state, action queues, role handoffs, retries, and operator tooling so agentic lanes can run continuously without turning into invisible cron-driven chaos.**
 
@@ -354,15 +354,15 @@ daedalus/
 
 ---
 
-## Current Deployment (YoYoPod)
+## Example Transitional Deployment
 
-The current YoYoPod deployment is a **sensible transitional architecture**:
+One practical deployment shape is a **sensible transitional architecture**:
 
 | Layer | Owner | Role |
 |---|---|---|
-| **Wrapper** | YoYoPod workflow | Semantic policy engine |
+| **Workflow module** | Project workflow | Semantic policy engine |
 | **Daedalus active service** | systemd | Recurring dispatcher |
-| **Wrapper `tick`** | Manual fallback | Operator override |
+| **Workflow `tick`** | Manual fallback | Operator override |
 | **Milestone notifier** | Hermes cron | Support job (not orchestrator) |
 | **Outage alerts** | Daedalus alerts | Support surface (not scheduler) |
 

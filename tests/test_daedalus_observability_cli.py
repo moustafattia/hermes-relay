@@ -18,7 +18,7 @@ def load_module(module_name: str, relative_path: str):
 
 
 def _make_workflow_root(tmp_path):
-    root = tmp_path / "yoyopod_core"
+    root = tmp_path / "workflow_example"
     (root / "runtime" / "state" / "daedalus").mkdir(parents=True)
     (root / "config").mkdir()
     (root / "workspace").mkdir()
@@ -76,7 +76,7 @@ def test_get_observability_shows_default_source_when_no_yaml_no_override(tmp_pat
     (root / "config" / "workflow.yaml").write_text("""\
 workflow: code-review
 schema-version: 1
-instance: {name: yoyopod, engine-owner: hermes}
+instance: {name: workflow-example, engine-owner: hermes}
 repository: {local-path: /tmp, github-slug: o/r, active-lane-label: active-lane}
 runtimes:
   acpx-codex:
@@ -107,7 +107,7 @@ def test_get_observability_shows_override_source_when_overridden(tmp_path):
     (root / "config" / "workflow.yaml").write_text("""\
 workflow: code-review
 schema-version: 1
-instance: {name: yoyopod, engine-owner: hermes}
+instance: {name: workflow-example, engine-owner: hermes}
 repository: {local-path: /tmp, github-slug: o/r, active-lane-label: active-lane}
 runtimes:
   acpx-codex:

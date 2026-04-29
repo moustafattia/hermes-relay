@@ -94,11 +94,14 @@ def test_get_ledger_field_handles_none_ledger():
     assert get_ledger_field(None, "internalReviewerModel") is None
 
 
-def test_existing_yoyopod_ledger_top_level_migration(tmp_path):
+def test_existing_installed_workflow_ledger_top_level_migration(tmp_path):
     from workflows.code_review.migrations import migrate_persisted_ledger
-    src = Path(os.path.expanduser("~/.hermes/workflows/yoyopod/memory/yoyopod-workflow-status.json"))
+    plugin_dir = Path.home() / ".hermes" / "plugins" / "daedalus"
+    if not plugin_dir.exists():
+        pytest.skip("installed workflow plugin not present")
+    src = plugin_dir.resolve().parents[2] / "memory" / "workflow-status.json"
     if not src.exists():
-        pytest.skip("yoyopod ledger not present")
+        pytest.skip("installed workflow ledger not present")
     dst = tmp_path / "l.json"
     dst.write_text(src.read_text())
     migrate_persisted_ledger(dst)
@@ -122,4 +125,3 @@ def test_lane_state_read_falls_back_to_legacy_lastClaudeVerdict():
     src = (Path(__file__).resolve().parent.parent / "daedalus" / "workflows/code_review/reviews.py").read_text()
     # The reads should reference both keys (new first, legacy fallback)
     assert "lastInternalVerdict" in src
-

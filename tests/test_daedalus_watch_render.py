@@ -76,7 +76,7 @@ import sqlite3
 
 
 def _make_workflow_root(tmp_path):
-    root = tmp_path / "yoyopod_core"
+    root = tmp_path / "workflow_example"
     (root / "runtime" / "memory").mkdir(parents=True)
     (root / "runtime" / "state" / "daedalus").mkdir(parents=True)
     (root / "config").mkdir()

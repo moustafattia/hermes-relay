@@ -11,7 +11,7 @@ from workflows.code_review.reviews import (
 )
 
 
-"""Top-level YoYoPod Core workflow orchestration entrypoints.
+"""Top-level code-review workflow orchestration entrypoints.
 
 This slice extracts a safe subset of next-action derivation from the legacy
 wrapper. Where the adapter does not yet own a branch, it falls back to the

@@ -20,9 +20,9 @@ def test_render_implementation_dispatch_prompt_uses_compact_turn_for_continue_se
     result = prompts_module.render_implementation_dispatch_prompt(
         issue={"number": 224, "title": "Issue 224", "url": "https://example.com/issues/224"},
         issue_details={"body": "Long issue body that should not appear on compact turns."},
-        worktree=Path('/tmp/yoyopod-issue-224'),
-        lane_memo_path=Path('/tmp/yoyopod-issue-224/.lane-memo.md'),
-        lane_state_path=Path('/tmp/yoyopod-issue-224/.lane-state.json'),
+        worktree=Path('/tmp/issue-224'),
+        lane_memo_path=Path('/tmp/issue-224/.lane-memo.md'),
+        lane_state_path=Path('/tmp/issue-224/.lane-state.json'),
         open_pr=None,
         action='continue-session',
         workflow_state='implementing_local',
@@ -39,7 +39,7 @@ def test_render_implementation_dispatch_prompt_includes_issue_summary_for_restar
     result = prompts_module.render_implementation_dispatch_prompt(
         issue={"number": 224, "title": "Issue 224", "url": "https://example.com/issues/224"},
         issue_details={"body": "Full issue body for restart turns."},
-        worktree=Path('/tmp/yoyopod-issue-224'),
+        worktree=Path('/tmp/issue-224'),
         lane_memo_path=None,
         lane_state_path=None,
         open_pr={"number": 301, "url": "https://example.com/pull/301", "headRefOid": "abc123"},
@@ -60,8 +60,8 @@ def test_render_claude_repair_handoff_prompt_includes_review_summary_and_fix_lis
         issue={"number": 224, "title": "Issue 224"},
         internal_review={"reviewedHeadSha": "abc123", "summary": "Claude found some stuff."},
         repair_brief={"mustFix": [{"summary": "Fix A"}], "shouldFix": [{"summary": "Fix B"}]},
-        lane_memo_path=Path('/tmp/yoyopod-issue-224/.lane-memo.md'),
-        lane_state_path=Path('/tmp/yoyopod-issue-224/.lane-state.json'),
+        lane_memo_path=Path('/tmp/issue-224/.lane-memo.md'),
+        lane_state_path=Path('/tmp/issue-224/.lane-state.json'),
         internal_reviewer_agent_name='Internal_Reviewer_Agent',
     )
 
@@ -104,7 +104,7 @@ def test_summarize_validation_and_render_lane_memo_capture_checks_progress_and_f
     )
     memo = prompts_module.render_lane_memo(
         issue={"number": 224, "title": "Issue 224", "url": "https://example.com/issues/224"},
-        worktree=Path('/tmp/yoyopod-issue-224'),
+        worktree=Path('/tmp/issue-224'),
         branch='codex/issue-224-test',
         open_pr={"number": 301, "url": "https://example.com/pull/301", "headRefOid": "abc123"},
         repair_brief={"mustFix": [{"summary": "Fix A"}], "shouldFix": [{"summary": "Fix B"}]},

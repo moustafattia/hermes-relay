@@ -8,26 +8,26 @@ import os
 from pathlib import Path
 from typing import Any
 
-from workflows.code_review.paths import resolve_default_workflow_root as resolve_yoyopod_core_workflow_root
-from workflows.code_review.paths import runtime_paths as yoyopod_runtime_paths
+from workflows.code_review.paths import resolve_default_workflow_root as resolve_workflow_root_default
+from workflows.code_review.paths import runtime_paths as workflow_runtime_paths
 
 PLUGIN_DIR = Path(__file__).resolve().parent
 DEFAULT_WORKFLOW_ROOT_ENV_VARS = ("DAEDALUS_WORKFLOW_ROOT",)
 
 
 def resolve_default_workflow_root() -> Path:
-    return resolve_yoyopod_core_workflow_root(plugin_dir=PLUGIN_DIR)
+    return resolve_workflow_root_default(plugin_dir=PLUGIN_DIR)
 
 
 DEFAULT_WORKFLOW_ROOT = resolve_default_workflow_root()
-DEFAULT_STATE_PATH = yoyopod_runtime_paths(DEFAULT_WORKFLOW_ROOT)["alert_state_path"]
+DEFAULT_STATE_PATH = workflow_runtime_paths(DEFAULT_WORKFLOW_ROOT)["alert_state_path"]
 
 
 def _load_tools_module():
     module_path = PLUGIN_DIR / "tools.py"
     spec = importlib.util.spec_from_file_location("daedalus_tools_for_alerts", module_path)
     if spec is None or spec.loader is None:
-        raise RuntimeError(f"unable to load relay plugin tools from {module_path}")
+        raise RuntimeError(f"unable to load Daedalus plugin tools from {module_path}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -69,7 +69,7 @@ def _critical_issues(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
         issues.append(
             {
                 "code": "active_execution_gate",
-                "summary": "Relay active execution gate is blocked",
+                "summary": "Daedalus active execution gate is blocked",
                 "reasons": [str(reason) for reason in (active_gate.get("reasons") or [])],
             }
         )
@@ -102,7 +102,7 @@ def _alert_message(*, issues: list[dict[str, Any]], snapshot: dict[str, Any]) ->
         suffix = f" ({', '.join(reasons)})" if reasons else ""
         issue_bits.append(f"{issue.get('code')}{suffix}")
     return (
-        "YoYoPod Relay alert: "
+        "Daedalus alert: "
         f"primary={owner.get('primary_owner')} "
         f"issues=" + "; ".join(issue_bits)
     )
@@ -111,7 +111,7 @@ def _alert_message(*, issues: list[dict[str, Any]], snapshot: dict[str, Any]) ->
 def _resolution_message(snapshot: dict[str, Any]) -> str:
     owner = _owner_summary(snapshot)
     return (
-        "YoYoPod Relay recovered: "
+        "Daedalus recovered: "
         f"primary={owner.get('primary_owner')} "
         f"gate_allowed={owner.get('gate_allowed')}"
     )
@@ -202,7 +202,7 @@ def build_current_decision(*, workflow_root: Path, state_path: Path) -> dict[str
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Build Relay outage alert decisions.")
+    parser = argparse.ArgumentParser(description="Build Daedalus outage alert decisions.")
     parser.add_argument("--workflow-root", default=str(DEFAULT_WORKFLOW_ROOT))
     parser.add_argument("--state-path", default=str(DEFAULT_STATE_PATH))
     parser.add_argument("--delivery-json")

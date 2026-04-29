@@ -25,7 +25,8 @@ def test_install_into_default_hermes_home_copies_plugin_tree(tmp_path):
     assert (plugin_dir / "runtime.py").exists()
     assert (plugin_dir / "alerts.py").exists()
     assert (plugin_dir / "workflows" / "code_review" / "status.py").exists()
-    assert (plugin_dir / "projects" / "yoyopod_core" / "config" / "project.json").exists()
+    assert (plugin_dir / "workflows" / "code_review" / "workflow.template.yaml").exists()
+    assert list((plugin_dir / "projects").glob("*/config/project.json"))
     assert (plugin_dir / "skills" / "operator" / "SKILL.md").exists()
 
 
@@ -40,22 +41,22 @@ def test_install_into_explicit_destination_uses_given_path(tmp_path):
     assert (target / "plugin.yaml").exists()
     assert (target / "tools.py").exists()
     assert (target / "workflows" / "code_review" / "workflow.py").exists()
-    assert (target / "projects" / "yoyopod_core" / "workspace" / "README.md").exists()
+    assert list((target / "projects").glob("*/workspace/README.md"))
 
 
-def test_install_follows_symlink_destination_and_preserves_the_link(tmp_path):
-    """Reinstall into a symlinked plugin path works and leaves the symlink intact.
+def test_install_replaces_legacy_symlink_destination_with_real_directory(tmp_path):
+    """A legacy symlinked install is retired in place.
 
-    Matches the real-world setup where ``~/.hermes/plugins/daedalus`` is a
-    symlink to ``~/.hermes/workflows/<project>/.hermes/plugins/daedalus``.
-    Before this fix ``shutil.rmtree`` errored with ``OSError: Cannot call
-    rmtree on a symbolic link``.
+    The canonical install target is now a real directory at
+    ``~/.hermes/plugins/daedalus``. If that path is still a symlink to an old
+    workflow-local plugin tree, reinstall removes the symlink and recreates the
+    global directory without mutating the old external target.
     """
     install = load_install_module()
     repo_root = Path(__file__).resolve().parents[1]
     real_plugin_dir = tmp_path / "workflow" / ".hermes" / "plugins" / "daedalus"
     real_plugin_dir.mkdir(parents=True)
-    # Seed the real dir with a stale file that must be wiped by reinstall.
+    # Seed the old workflow-local target; reinstall should not follow into it.
     (real_plugin_dir / "stale.txt").write_text("stale", encoding="utf-8")
 
     symlink_target = tmp_path / ".hermes" / "plugins" / "daedalus"
@@ -65,12 +66,11 @@ def test_install_follows_symlink_destination_and_preserves_the_link(tmp_path):
     result = install.install_plugin(repo_root=repo_root, destination=symlink_target)
 
     assert result == symlink_target
-    assert symlink_target.is_symlink(), "reinstall must preserve the symlink"
-    # The payload lives in the real directory, reachable via the symlink.
+    assert symlink_target.is_dir()
+    assert not symlink_target.is_symlink()
     assert (symlink_target / "plugin.yaml").exists()
-    assert (real_plugin_dir / "plugin.yaml").exists()
-    # Stale file is gone.
-    assert not (real_plugin_dir / "stale.txt").exists()
+    # Old workflow-local target is untouched.
+    assert (real_plugin_dir / "stale.txt").exists()
 
 
 def test_install_replaces_existing_regular_directory(tmp_path):

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One-shot migrator: legacy yoyopod-workflow.json → workflow.yaml.
+"""One-shot migrator: legacy workflow JSON -> workflow.yaml.
 
 Usage: python3 scripts/migrate_config.py <old-json-path> <new-yaml-path>
 
@@ -27,11 +27,13 @@ def convert(old: dict) -> dict:
     # Infer workspace name from paths (used as instance.name).
     instance_name = Path(old.get("ledgerPath", "")).parent.parent.name or "default"
 
-    # Derive github-slug from repoPath when possible; otherwise require operator
-    # fixup post-migration. The live YoyoPod_Core path is well-known.
-    github_slug = "FIXME/FIXME"
-    if "YoyoPod_Core" in repo_path:
-        github_slug = "moustafattia/YoyoPod_Core"
+    # Do not guess a repository slug from host-specific path conventions.
+    # Carry any explicit legacy field forward; otherwise require operator fixup.
+    github_slug = (
+        old.get("githubSlug")
+        or old.get("repositorySlug")
+        or "FIXME/FIXME"
+    )
 
     return {
         "workflow": "code-review",
@@ -152,7 +154,7 @@ def convert(old: dict) -> dict:
                 "interval-hours": 1,
                 "delivery": {
                     "channel": "telegram",
-                    "chat-id": "-1003651617977",
+                    "chat-id": "FIXME_CHAT_ID",
                 },
             },
         },

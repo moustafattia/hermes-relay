@@ -11,7 +11,7 @@ from typing import Any, Callable
 from workflows.code_review.migrations import get_lane_state_review_field, get_review
 
 
-"""YoYoPod Core session and worktree helpers.
+"""Workflow session and worktree helpers.
 
 This slice extracts the session-action recommendation logic from the legacy
 wrapper so the adapter can own a meaningful part of the read model.
@@ -20,7 +20,7 @@ wrapper so the adapter can own a meaningful part of the read model.
 
 ISSUE_PREFIX_RE = re.compile(r"^\[[^\]]+\]\s*")
 ISSUE_BRANCH_RE = re.compile(r"issue-(\d+)")
-ISSUE_WORKTREE_RE = re.compile(r"yoyopod-issue-(\d+)")
+ISSUE_WORKTREE_RE = re.compile(r"issue-(\d+)")
 NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
 MULTI_DASH_RE = re.compile(r"-+")
 
@@ -48,7 +48,7 @@ def slugify_issue_title(title: str | None) -> str:
 def expected_lane_worktree(issue_number: int | None) -> Path | None:
     if issue_number is None:
         return None
-    return Path(f"/tmp/yoyopod-issue-{issue_number}")
+    return Path(f"/tmp/issue-{issue_number}")
 
 
 

@@ -5,6 +5,7 @@ Entry point for everything that won't fit on the [project landing page](../READM
 ## Start here
 
 - **[architecture.md](architecture.md)** — the big picture. What Daedalus is, what it isn't, how the pieces fit together.
+- **[examples/code-review.workflow.yaml](examples/code-review.workflow.yaml)** — copyable public baseline for `config/workflow.yaml`.
 
 ## Concepts
 
@@ -42,6 +43,7 @@ docs/
 ├── architecture.md          big picture
 │
 ├── concepts/                "what does X mean" — one file per abstraction
+├── examples/                copyable config baselines
 ├── operator/                day-2 surface — cheat sheets, commands, endpoints
 │
 ├── adr/                     architectural decisions (immutable record)

@@ -142,13 +142,15 @@ def test_migrate_persisted_ledger_preserves_indent(tmp_path):
     assert "  " in text  # 2-space indent preserved
 
 
-def test_existing_yoyopod_ledger_migrates_cleanly(tmp_path):
-    """Smoke test: copy live yoyopod ledger to tmp, migrate, assert it works."""
+def test_existing_installed_workflow_ledger_migrates_cleanly(tmp_path):
+    """Smoke test: copy the installed workflow ledger to tmp, migrate, assert it works."""
     from workflows.code_review.migrations import migrate_persisted_ledger, get_review
-    import os
-    src = Path(os.path.expanduser("~/.hermes/workflows/yoyopod/memory/yoyopod-workflow-status.json"))
+    plugin_dir = Path.home() / ".hermes" / "plugins" / "daedalus"
+    if not plugin_dir.exists():
+        pytest.skip("installed workflow plugin not present on this host")
+    src = plugin_dir.resolve().parents[2] / "memory" / "workflow-status.json"
     if not src.exists():
-        pytest.skip("yoyopod ledger not present on this host")
+        pytest.skip("installed workflow ledger not present on this host")
 
     dst = tmp_path / "ledger.json"
     dst.write_text(src.read_text())

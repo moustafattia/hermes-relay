@@ -23,11 +23,11 @@ def _example_status() -> dict:
     return {
         "runtime_status": "running",
         "current_mode": "active",
-        "active_orchestrator_instance_id": "daedalus-active-yoyopod",
+        "active_orchestrator_instance_id": "daedalus-active-workflow-example",
         "schema_version": 3,
         "lane_count": 14,
-        "db_path": "/home/x/.hermes/workflows/yoyopod/runtime/state/daedalus/daedalus.db",
-        "event_log_path": "/home/x/.hermes/workflows/yoyopod/runtime/memory/daedalus-events.jsonl",
+        "db_path": "/home/x/.hermes/workflows/workflow-example/runtime/state/daedalus/daedalus.db",
+        "event_log_path": "/home/x/.hermes/workflows/workflow-example/runtime/memory/daedalus-events.jsonl",
         "latest_heartbeat_at": "2026-04-26T22:43:01Z",
     }
 
@@ -44,7 +44,7 @@ def test_format_status_includes_title_and_state():
 def test_format_status_includes_owner_and_schema():
     fmt = _fmt()
     out = fmt.format_status(_example_status(), use_color=False, now_iso="2026-04-26T22:43:18Z")
-    assert "daedalus-active-yoyopod" in out
+    assert "daedalus-active-workflow-example" in out
     assert "v3" in out or "schema" in out
 
 

@@ -66,7 +66,7 @@ def test_color_wrapper_wraps_with_ansi_when_enabled():
 def test_panel_with_single_section_no_section_header():
     fmt = _module()
     out = fmt.format_panel(
-        title="Daedalus runtime — yoyopod",
+        title="Daedalus runtime — workflow-example",
         sections=[
             fmt.Section(name=None, rows=[
                 fmt.Row(label="state", value="running"),
@@ -75,7 +75,7 @@ def test_panel_with_single_section_no_section_header():
         ],
         use_color=False,
     )
-    assert "Daedalus runtime — yoyopod" in out
+    assert "Daedalus runtime — workflow-example" in out
     assert "state" in out
     assert "running" in out
     assert "owner" in out

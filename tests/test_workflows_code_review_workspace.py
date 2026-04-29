@@ -2,6 +2,8 @@ import importlib.util
 import json
 from pathlib import Path
 
+import yaml
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1] / "daedalus"
 
@@ -24,11 +26,53 @@ def _minimal_config(tmp_path: Path) -> dict:
         "auditLogPath": str(tmp_path / "audit.jsonl"),
         "engineOwner": "hermes",
         "activeLaneLabel": "active-lane",
-        "coreJobNames": ["yoyopod-workflow-watchdog"],
-        "hermesJobNames": ["yoyopod-workflow-milestone-telegram"],
+        "coreJobNames": ["workflow-watchdog"],
+        "hermesJobNames": ["workflow-milestone-notifier"],
         "sessionPolicy": {"codexModel": "gpt-5.3-codex-spark/high"},
         "reviewPolicy": {"claudeModel": "claude-sonnet-4-6"},
         "agentLabels": {"internalReviewerAgent": "Internal_Reviewer_Agent"},
+    }
+
+
+def _workflow_yaml_config(tmp_path: Path) -> dict:
+    return {
+        "workflow": "code-review",
+        "schema-version": 1,
+        "instance": {"name": "workflow-engine", "engine-owner": "hermes"},
+        "repository": {
+            "local-path": str(tmp_path / "repo"),
+            "github-slug": "owner/repo",
+            "active-lane-label": "active-lane",
+        },
+        "runtimes": {
+            "acpx-codex": {"kind": "acpx-codex"},
+            "claude-cli": {"kind": "claude-cli"},
+        },
+        "agents": {
+            "coder": {
+                "default": {
+                    "name": "Internal_Coder_Agent",
+                    "model": "gpt-5.3-codex-spark/high",
+                    "runtime": "acpx-codex",
+                },
+            },
+            "internal-reviewer": {
+                "name": "Internal_Reviewer_Agent",
+                "model": "claude-sonnet-4-6",
+                "runtime": "claude-cli",
+            },
+            "external-reviewer": {
+                "enabled": True,
+                "name": "External_Reviewer_Agent",
+            },
+        },
+        "gates": {"internal-review": {}, "external-review": {}, "merge": {}},
+        "triggers": {"lane-selector": {"type": "github-label", "label": "active-lane"}},
+        "storage": {
+            "ledger": "memory/workflow-status.json",
+            "health": "memory/workflow-health.json",
+            "audit-log": "memory/workflow-audit.jsonl",
+        },
     }
 
 
@@ -43,7 +87,7 @@ def test_make_workspace_exposes_config_constants_and_primitives(tmp_path):
     assert ws.HEALTH_PATH == Path(config["healthPath"])
     assert ws.ACTIVE_LANE_LABEL == "active-lane"
     assert ws.ENGINE_OWNER == "hermes"
-    assert ws.WORKFLOW_WATCHDOG_JOB_NAME == "yoyopod-workflow-watchdog"
+    assert ws.WORKFLOW_WATCHDOG_JOB_NAME == "workflow-watchdog"
     assert ws.INTER_REVIEW_AGENT_MODEL == "claude-sonnet-4-6"
     assert ws.INTERNAL_REVIEWER_AGENT_NAME == "Internal_Reviewer_Agent"
     assert ws.LANE_FAILURE_RETRY_BUDGET == 3
@@ -103,8 +147,8 @@ def test_load_workspace_from_config_reads_file(tmp_path):
     workspace_root = tmp_path / "workflow"
     config_dir = workspace_root / "config"
     config_dir.mkdir(parents=True)
-    config_path = config_dir / "yoyopod-workflow.json"
-    config_path.write_text(json.dumps(_minimal_config(tmp_path)), encoding="utf-8")
+    config_path = config_dir / "workflow.yaml"
+    config_path.write_text(yaml.safe_dump(_workflow_yaml_config(tmp_path)), encoding="utf-8")
 
     ws = workspace_module.load_workspace_from_config(workspace_root=workspace_root, config_path=config_path)
     assert ws.WORKSPACE == workspace_root.resolve()
@@ -130,14 +174,11 @@ def test_workspace_exposes_adapter_module_loaders(tmp_path):
         assert callable(getattr(ws, loader_name)), loader_name
 
 
-def test_workspace_adapter_loader_raises_when_plugin_missing(tmp_path):
+def test_workspace_adapter_loader_does_not_depend_on_workflow_local_plugin(tmp_path):
     workspace_module = load_module("daedalus_workflows_code_review_workspace_test", "workflows/code_review/workspace.py")
     ws = workspace_module.make_workspace(workspace_root=tmp_path, config=_minimal_config(tmp_path))
-    # No plugin dir under tmp_path/.hermes/plugins/daedalus; loading any adapter module raises.
-    import pytest
-
-    with pytest.raises(FileNotFoundError):
-        ws._load_adapter_status_module()
+    module = ws._load_adapter_status_module()
+    assert module.__file__.endswith("workflows/code_review/status.py")
 
 
 def test_workspace_exposes_full_wrapper_facade(tmp_path):
@@ -361,7 +402,7 @@ def test_workspace_from_yaml_exposes_same_surface_as_legacy_json(tmp_path):
     yaml_cfg = {
         "workflow": "code-review",
         "schema-version": 1,
-        "instance": {"name": "yoyopod", "engine-owner": "hermes"},
+        "instance": {"name": "workflow-engine", "engine-owner": "hermes"},
         "repository": {
             "local-path": str(tmp_path / "repo"),
             "github-slug": "owner/repo",

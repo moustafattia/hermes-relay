@@ -16,7 +16,7 @@ def load_module(module_name: str, relative_path: str):
 
 # Historical note: this file used to contain nine
 # ``test_*_prefers_raw_wrapper_function_when_present`` tests that wrote a
-# scaffold wrapper file at ``<workflow_root>/compat/yoyopod_workflow.py`` and
+# scaffold wrapper file at ``<workflow_root>/compat/legacy_workflow_wrapper.py`` and
 # asserted that ``actions.publish_ready_pr(workflow_root)`` /
 # ``merge_and_promote(workflow_root)`` / etc. loaded the wrapper and called
 # its ``*_raw`` functions, plus a tenth test that exercised
@@ -51,7 +51,7 @@ def test_run_publish_ready_pr_reports_no_active_lane_when_reconcile_has_none():
         run_fn=fake_run,
         audit_fn=fake_audit,
         mark_pr_ready_for_review_fn=fake_mark_ready,
-        repo_slug="moustafattia/YoyoPod_Core",
+        repo_slug="owner/repo",
         repo_path=Path("/tmp/repo"),
     )
 
@@ -70,7 +70,7 @@ def test_run_publish_ready_pr_marks_existing_draft_ready_without_pushing(tmp_pat
         call_order.append("reconcile")
         status = {
             "activeLane": {"number": 224, "title": "T"},
-            "implementation": {"worktree": str(worktree), "branch": "yoyopod-issue-224"},
+            "implementation": {"worktree": str(worktree), "branch": "issue-224"},
             "openPr": {"number": 301, "isDraft": True},
         }
         # Simulate the after-call reconcile reporting the PR is no longer a draft.
@@ -93,7 +93,7 @@ def test_run_publish_ready_pr_marks_existing_draft_ready_without_pushing(tmp_pat
         run_fn=fake_run,
         audit_fn=fake_audit,
         mark_pr_ready_for_review_fn=fake_mark_ready,
-        repo_slug="moustafattia/YoyoPod_Core",
+        repo_slug="owner/repo",
         repo_path=Path("/tmp/repo"),
     )
 
@@ -112,7 +112,7 @@ def test_run_push_pr_update_skips_when_pr_head_matches_local(tmp_path):
         return {
             "activeLane": {"number": 224},
             "openPr": {"number": 301, "headRefOid": "sha"},
-            "implementation": {"worktree": str(worktree), "branch": "yoyopod-issue-224", "localHeadSha": "sha"},
+            "implementation": {"worktree": str(worktree), "branch": "issue-224", "localHeadSha": "sha"},
         }
 
     def fake_run(*args, **kwargs):
@@ -142,7 +142,7 @@ def test_run_push_pr_update_pushes_updated_head_and_audits(tmp_path):
         return {
             "activeLane": {"number": 224},
             "openPr": {"number": 301, "headRefOid": "prsha"},
-            "implementation": {"worktree": str(worktree), "branch": "yoyopod-issue-224", "localHeadSha": "localsha"},
+            "implementation": {"worktree": str(worktree), "branch": "issue-224", "localHeadSha": "localsha"},
         }
 
     runs: list[dict] = []
@@ -165,7 +165,7 @@ def test_run_push_pr_update_pushes_updated_head_and_audits(tmp_path):
     )
     assert result["pushed"] is True
     assert result["prNumber"] == 301
-    assert runs[0]["command"] == ["git", "push", "origin", "HEAD:yoyopod-issue-224"]
+    assert runs[0]["command"] == ["git", "push", "origin", "HEAD:issue-224"]
     assert audits[0]["action"] == "push-pr-update"
     assert len(reconcile_calls) == 2
 
@@ -187,7 +187,7 @@ def test_run_merge_and_promote_skips_when_missing_active_lane_or_pr():
         pick_next_lane_issue_fn=lambda: None,
         now_iso_fn=lambda: "2026-04-23T00:00:00Z",
         active_lane_label="P0",
-        repo_slug="moustafattia/YoyoPod_Core",
+        repo_slug="owner/repo",
         repo_path=Path("/tmp/repo"),
     )
     assert result == {"merged": False, "reason": "missing-active-lane-or-pr"}
@@ -238,7 +238,7 @@ def test_run_merge_and_promote_promotes_next_lane_after_merge():
         pick_next_lane_issue_fn=fake_next,
         now_iso_fn=lambda: "2026-04-23T00:00:00Z",
         active_lane_label="P0",
-        repo_slug="moustafattia/YoyoPod_Core",
+        repo_slug="owner/repo",
         repo_path=Path("/tmp/repo"),
     )
     assert result["merged"] is True
@@ -347,7 +347,7 @@ def test_run_dispatch_lane_turn_executes_continue_session_when_healthy(tmp_path)
         "activeLane": {"number": 224, "title": "T", "url": "https://example.test/issue/224"},
         "implementation": {
             "worktree": str(worktree),
-            "branch": "yoyopod-issue-224",
+            "branch": "issue-224",
             "sessionName": "lane-224",
             "codexModel": "gpt-5.3-codex",
             "resumeSessionId": "sess-abc",
@@ -382,7 +382,7 @@ def test_run_dispatch_lane_turn_closes_session_for_restart(tmp_path):
         "activeLane": {"number": 224, "title": "T", "url": "https://example.test/issue/224"},
         "implementation": {
             "worktree": str(worktree),
-            "branch": "yoyopod-issue-224",
+            "branch": "issue-224",
             "sessionName": "lane-224",
             "sessionActionRecommendation": {"action": "restart-session"},
             "laneState": {},

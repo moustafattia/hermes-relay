@@ -64,7 +64,7 @@ def test_get_observability_dispatched_not_falling_through_to_unknown(tmp_path):
 def test_watch_dispatched_not_falling_through_to_unknown(tmp_path):
     """``/daedalus watch --once`` should reach cmd_watch (one-shot render)."""
     # Build a workflow root the watch sources can read.
-    root = tmp_path / "yoyopod_core"
+    root = tmp_path / "workflow_example"
     (root / "runtime" / "memory").mkdir(parents=True)
     (root / "runtime" / "state" / "daedalus").mkdir(parents=True)
     (root / "config").mkdir()
@@ -76,3 +76,14 @@ def test_watch_dispatched_not_falling_through_to_unknown(tmp_path):
     assert "unknown daedalus command" not in out, out
     # The watch panel renders a recognizable header even with no data.
     assert "Daedalus active lanes" in out or "active lanes" in out.lower()
+
+
+def test_scaffold_workflow_dispatched_not_falling_through_to_unknown(tmp_path):
+    tools = _tools()
+    root = tmp_path / "attmous-daedalus-code-review"
+    out = tools.execute_raw_args(
+        f"scaffold-workflow --workflow-root {root} --github-slug attmous/daedalus"
+    )
+    assert "unknown daedalus command" not in out, out
+    assert "scaffolded workflow root" in out
+    assert (root / "config" / "workflow.yaml").exists()

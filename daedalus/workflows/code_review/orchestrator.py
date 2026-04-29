@@ -7,15 +7,12 @@ from typing import Any
 from workflows.code_review.migrations import get_review
 
 
-"""YoYoPod Core workflow orchestration (read-model + reconcile).
+"""Code-review workflow orchestration (read-model + reconcile).
 
 This module hosts the canonical ``build_status_raw`` and ``reconcile`` bodies
-that used to live in the legacy ``scripts/yoyopod_workflow.py`` wrapper. Each
-function takes a ``workspace`` accessor — a module-or-namespace-like object
+that operate on a ``workspace`` accessor — a module-or-namespace-like object
 exposing the workspace-scoped primitives (``load_jobs``, ``load_ledger``,
-``audit``, ``_run``, path constants, review/session helpers, etc.). Passing
-the legacy wrapper module directly is the intended usage, which keeps the
-retired wrapper script as a thin workspace-config binding.
+``audit``, ``_run``, path constants, review/session helpers, etc.).
 """
 
 

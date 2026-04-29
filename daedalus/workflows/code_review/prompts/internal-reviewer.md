@@ -1,4 +1,4 @@
-You are reviewing the unpublished local lane head for YoyoPod_Core as a strict pre-publish code review gate.
+You are reviewing the unpublished local lane head as a strict pre-publish code review gate.
 Repository: {worktree}
 Target local head SHA: {head_sha}
 Scope: local-prepublish only. Review the actual current local HEAD in this worktree.

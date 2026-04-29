@@ -1,4 +1,4 @@
-YoyoPod_Core active lane owner for issue #{issue_number} in {worktree}.
+Active lane owner for issue #{issue_number} in {worktree}.
 Issue: #{issue_number} {issue_title}
 Issue URL: {issue_url}
 {lane_memo_line}

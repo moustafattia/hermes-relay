@@ -19,7 +19,7 @@ def _fmt():
 
 def _example_service_status():
     return {
-        "service_name": "daedalus-active@yoyopod.service",
+        "service_name": "daedalus-active@workflow-example.service",
         "service_mode": "active",
         "installed": True,
         "enabled": True,
@@ -35,7 +35,7 @@ def _example_service_status():
 def test_service_status_renders_identity_and_runtime():
     fmt = _fmt()
     out = fmt.format_service_status(_example_service_status(), use_color=False)
-    assert "daedalus-active@yoyopod.service" in out
+    assert "daedalus-active@workflow-example.service" in out
     assert "12345" in out
     # 3-state install row
     assert "installed" in out
