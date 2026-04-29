@@ -29,7 +29,7 @@ class Runtime(Protocol):
 | `close_session` | no-op | `acpx codex sessions close` | no-op |
 | Records `last_activity_ts` | yes (before + after `_run`) | yes | yes |
 
-## Selection in `workflow.yaml`
+## Selection in `WORKFLOW.md`
 
 ```yaml
 runtimes:
@@ -56,7 +56,7 @@ The preflight pass walks `runtimes.<name>.kind` and `agents.external-reviewer.ki
 
 ### `hermes-agent` runtime
 
-The `hermes-agent` runtime delegates turns to a local Hermes agent process. It is **one-shot** (no persistent session) and requires a `command:` override in `workflow.yaml` because the exact invocation depends on the agent's entry point.
+The `hermes-agent` runtime delegates turns to a local Hermes agent process. It is **one-shot** (no persistent session) and requires a `command:` override in `WORKFLOW.md` because the exact invocation depends on the agent's entry point.
 
 ```yaml
 runtimes:

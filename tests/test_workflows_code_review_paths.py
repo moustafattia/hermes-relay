@@ -75,17 +75,7 @@ def _write_workflow_markdown(workflow_root: Path, *, instance_name: str = "bluep
     }
     workflow_root.mkdir(parents=True, exist_ok=True)
     (workflow_root / "WORKFLOW.md").write_text(
-        "---\n"
-        + yaml.safe_dump(
-            {
-                "daedalus": {
-                    "prompt-role": "coder",
-                    "workflow-config": config,
-                },
-            },
-            sort_keys=False,
-        )
-        + "---\n\nPrompt body\n",
+        "---\n" + yaml.safe_dump(config, sort_keys=False) + "---\n\nPrompt body\n",
         encoding="utf-8",
     )
 

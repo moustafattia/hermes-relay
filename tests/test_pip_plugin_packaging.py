@@ -78,7 +78,7 @@ def test_wheel_contains_runtime_loaded_plugin_payload(tmp_path):
         "daedalus/plugin.yaml",
         "daedalus/skills/operator/SKILL.md",
         "daedalus/workflows/code_review/schema.yaml",
-        "daedalus/workflows/code_review/workflow.template.yaml",
+        "daedalus/workflows/code_review/workflow.template.md",
         "daedalus/workflows/code_review/prompts/coder.md",
         "daedalus/projects/yoyopod_core/config/project.json",
     }
@@ -124,4 +124,4 @@ def test_wheel_extracts_to_working_plugin_package(tmp_path):
         f"scaffold-workflow --workflow-root {workflow_root} --github-slug attmous/daedalus"
     )
     assert "daedalus error:" not in out, out
-    assert (workflow_root / "config" / "workflow.yaml").exists()
+    assert (workflow_root / "WORKFLOW.md").exists()

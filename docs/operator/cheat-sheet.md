@@ -365,7 +365,7 @@ python3 ~/.hermes/plugins/daedalus/workflows/__main__.py \
 
 ## Config Hot-Reload
 
-### Check if a bad edit is being ignored
+### Check if a bad WORKFLOW.md edit is being ignored
 ```bash
 /daedalus doctor
 ```
@@ -374,7 +374,7 @@ Look for `config_reload_failed` in the event tail or doctor output.
 ### Force a config re-read
 ```bash
 # Touch the file; the next tick will pick it up.
-touch ~/.hermes/workflows/<profile>/workflow.yaml
+touch ~/.hermes/workflows/<owner>-<repo>-<workflow-type>/WORKFLOW.md
 ```
 
 ### Show effective config (merged layers)

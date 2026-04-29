@@ -120,7 +120,7 @@ See [failures.md](failures.md) for the full failure/retry model. At the action l
 
 - `retry_count` starts at `0`.
 - Each retry attempt increments it.
-- `max_retries` is configured in `workflow.yaml` (default: `3`).
+- `max_retries` is configured in `WORKFLOW.md` (default: `3`).
 - The retry reason is recorded: `stall_timeout`, `runtime_error`, `operator_reset`, etc.
 
 ---

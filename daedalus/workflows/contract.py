@@ -1,15 +1,13 @@
 """Workflow contract loading for Daedalus.
 
-Daedalus currently supports two workflow-contract entrypoints:
+Daedalus supports two workflow-contract entrypoints:
 
-- ``config/workflow.yaml``: the native Daedalus instance config
-- ``WORKFLOW.md``: a Symphony-style Markdown contract with YAML front matter
+- ``WORKFLOW.md``: the native public contract
+- ``config/workflow.yaml``: a legacy load-only input
 
-The Markdown form is a compatibility/front-door layer. It does not yet map the
-entire Symphony front matter directly into Daedalus runtime settings; instead,
-it expects a ``daedalus.workflow-config`` mapping containing the native
-Daedalus config and optionally injects the Markdown body into
-``prompts.<role>``.
+Both ultimately feed the same internal config object. ``WORKFLOW.md`` uses YAML
+front matter for the structured config and its Markdown body as the shared
+workflow policy text.
 """
 from __future__ import annotations
 
@@ -22,6 +20,7 @@ import yaml
 
 DEFAULT_WORKFLOW_CONFIG_FILENAME = "config/workflow.yaml"
 DEFAULT_WORKFLOW_MARKDOWN_FILENAME = "WORKFLOW.md"
+WORKFLOW_POLICY_KEY = "workflow-policy"
 
 
 class WorkflowContractError(RuntimeError):
@@ -49,15 +48,15 @@ def workflow_markdown_path(workflow_root: Path) -> Path:
 def find_workflow_contract_path(workflow_root: Path) -> Path | None:
     """Return the preferred contract path for a workflow root, if any.
 
-    ``config/workflow.yaml`` remains the first choice so existing instances do
-    not change behavior if both files are present.
+    ``WORKFLOW.md`` is the native public contract and wins when both forms are
+    present. ``config/workflow.yaml`` remains loadable for legacy instances.
     """
-    yaml_path = workflow_yaml_path(workflow_root)
-    if yaml_path.exists():
-        return yaml_path
     markdown_path = workflow_markdown_path(workflow_root)
     if markdown_path.exists():
         return markdown_path
+    yaml_path = workflow_yaml_path(workflow_root)
+    if yaml_path.exists():
+        return yaml_path
     return None
 
 
@@ -96,7 +95,9 @@ def _load_yaml_contract(path: Path) -> WorkflowContract:
     return WorkflowContract(
         source_path=path,
         config=payload,
-        prompt_template="",
+        prompt_template=str(payload.get(WORKFLOW_POLICY_KEY) or "").strip()
+        if isinstance(payload.get(WORKFLOW_POLICY_KEY), str)
+        else "",
         front_matter={},
     )
 
@@ -156,31 +157,40 @@ def _project_markdown_front_matter(
     front_matter: dict[str, Any],
     prompt_template: str,
 ) -> dict[str, Any]:
-    extension = front_matter.get("daedalus") or {}
-    if not isinstance(extension, dict):
-        raise WorkflowContractError(f"{path} must define daedalus: as a mapping")
-
-    raw_config = extension.get("workflow-config")
-    if raw_config is None:
+    config = deepcopy(front_matter)
+    existing_policy = config.get(WORKFLOW_POLICY_KEY)
+    if existing_policy is not None and not isinstance(existing_policy, str):
+        raise WorkflowContractError(f"{path} {WORKFLOW_POLICY_KEY} must be a string when present")
+    if existing_policy and prompt_template:
         raise WorkflowContractError(
-            f"{path} must define daedalus.workflow-config to map WORKFLOW.md "
-            "into the current Daedalus workflow schema"
+            f"{path} defines both front-matter {WORKFLOW_POLICY_KEY!r} and a Markdown body; "
+            "use the body as the workflow policy source"
         )
-    if not isinstance(raw_config, dict):
-        raise WorkflowContractError(f"{path} daedalus.workflow-config must be a mapping")
-
-    config = deepcopy(raw_config)
-    prompt_role = extension.get("prompt-role", "coder")
-    if not isinstance(prompt_role, str) or not prompt_role.strip():
-        raise WorkflowContractError(f"{path} daedalus.prompt-role must be a non-empty string")
-
     if prompt_template:
-        prompts = config.get("prompts")
-        if prompts is None:
-            prompts = {}
-            config["prompts"] = prompts
-        if not isinstance(prompts, dict):
-            raise WorkflowContractError(f"{path} prompts must be a mapping when present")
-        prompts[prompt_role.strip()] = prompt_template
-
+        config[WORKFLOW_POLICY_KEY] = prompt_template
     return config
+
+
+def render_workflow_markdown(*, config: dict[str, Any], prompt_template: str | None = None) -> str:
+    """Render a native ``WORKFLOW.md`` file from config + policy text."""
+    front_matter = deepcopy(config)
+    body = prompt_template
+    if body is None:
+        policy = front_matter.pop(WORKFLOW_POLICY_KEY, "")
+        if policy is None:
+            body = ""
+        elif isinstance(policy, str):
+            body = policy
+        else:
+            raise WorkflowContractError(f"{WORKFLOW_POLICY_KEY} must be a string when rendering WORKFLOW.md")
+    else:
+        front_matter.pop(WORKFLOW_POLICY_KEY, None)
+
+    if not isinstance(front_matter, dict):
+        raise WorkflowContractError("workflow config must be a mapping when rendering WORKFLOW.md")
+
+    front_matter_text = yaml.safe_dump(front_matter, sort_keys=False).strip()
+    body_text = str(body or "").strip()
+    if body_text:
+        return f"---\n{front_matter_text}\n---\n\n{body_text}\n"
+    return f"---\n{front_matter_text}\n---\n"

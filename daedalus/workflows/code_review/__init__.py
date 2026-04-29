@@ -8,7 +8,7 @@ This package satisfies the daedalus workflow-plugin contract:
 
 - NAME: the canonical hyphenated workflow name ("code-review")
 - SUPPORTED_SCHEMA_VERSIONS: tuple of config schema versions this module accepts
-- CONFIG_SCHEMA_PATH: Path to the JSON Schema validating the workflow.yaml config
+- CONFIG_SCHEMA_PATH: Path to the JSON Schema validating the workflow contract
 - make_workspace(*, workflow_root, config): factory returning the workspace accessor
 - cli_main(workspace, argv): argparse-backed CLI dispatcher
 """

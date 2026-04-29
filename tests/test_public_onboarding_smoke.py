@@ -81,6 +81,7 @@ def test_readme_quickstart_mentions_supported_public_path():
     assert "hermes plugins install attmous/daedalus --enable" in readme
     assert "hermes daedalus scaffold-workflow" in readme
     assert "scaffold-workflow" in readme
+    assert "WORKFLOW.md" in readme
     assert "service-install" in readme
     assert "docs/operator/installation.md" in readme
     assert "docs/public-contract.md" in readme

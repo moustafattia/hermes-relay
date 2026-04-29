@@ -11,7 +11,14 @@ from contextlib import redirect_stderr
 from pathlib import Path
 from typing import Any
 
-from workflows.contract import WorkflowContractError, load_workflow_contract
+from workflows.contract import (
+    WorkflowContractError,
+    load_workflow_contract,
+    load_workflow_contract_file,
+    render_workflow_markdown,
+    workflow_yaml_path as legacy_workflow_config_path,
+    workflow_markdown_path,
+)
 from workflows.code_review.paths import (
     derive_workflow_instance_name,
     plugin_runtime_path,
@@ -1009,7 +1016,7 @@ def _lazy_cmd_watch(args, parser):
 
 def _workflow_template_path(workflow_name: str) -> Path:
     templates = {
-        "code-review": PLUGIN_DIR / "workflows" / "code_review" / "workflow.template.yaml",
+        "code-review": PLUGIN_DIR / "workflows" / "code_review" / "workflow.template.md",
     }
     path = templates.get(workflow_name)
     if path is None:
@@ -1027,19 +1034,23 @@ def scaffold_workflow_root(
     engine_owner: str,
     force: bool,
 ) -> dict[str, Any]:
-    import yaml  # type: ignore[import]
-
     root = workflow_root.expanduser().resolve()
-    config_path = root / "config" / "workflow.yaml"
-    if config_path.exists() and not force:
+    contract_path = workflow_markdown_path(root)
+    legacy_config_path = legacy_workflow_config_path(root)
+    existing_contract_path = contract_path if contract_path.exists() else legacy_config_path
+    if existing_contract_path.exists() and not force:
         raise DaedalusCommandError(
-            f"refusing to overwrite existing config: {config_path} (pass --force to replace it)"
+            f"refusing to overwrite existing workflow contract: {existing_contract_path} "
+            "(pass --force to replace it)"
         )
 
     template_path = _workflow_template_path(workflow_name)
-    config = yaml.safe_load(template_path.read_text(encoding="utf-8"))
-    if not isinstance(config, dict):
-        raise DaedalusCommandError(f"workflow template must be a YAML mapping: {template_path}")
+    try:
+        template_contract = load_workflow_contract_file(template_path)
+    except (WorkflowContractError, OSError, UnicodeDecodeError) as exc:
+        raise DaedalusCommandError(f"unable to load workflow template {template_path}: {exc}") from exc
+    config = dict(template_contract.config)
+    workflow_policy = template_contract.prompt_template
 
     resolved_github_slug = github_slug.strip()
     if not resolved_github_slug:
@@ -1086,18 +1097,22 @@ def scaffold_workflow_root(
         root / "runtime" / "state" / "daedalus",
         root / "workspace",
         resolved_repo_path,
+        root / "config",
     ]
     for path in created_dirs:
         path.mkdir(parents=True, exist_ok=True)
 
-    config_path.write_text(
-        yaml.safe_dump(config, sort_keys=False),
+    contract_path.write_text(
+        render_workflow_markdown(config=config, prompt_template=workflow_policy),
         encoding="utf-8",
     )
+    if force and legacy_config_path.exists():
+        legacy_config_path.unlink()
     return {
         "ok": True,
         "workflow_root": str(root),
-        "config_path": str(config_path),
+        "contract_path": str(contract_path),
+        "config_path": str(contract_path),
         "workflow": workflow_name,
         "instance_name": resolved_instance_name,
         "engine_owner": engine_owner,
@@ -1122,7 +1137,7 @@ def cmd_scaffold_workflow(args, parser) -> str:
         return json.dumps(result, indent=2, sort_keys=True)
     lines = [
         f"scaffolded workflow root: {result['workflow_root']}",
-        f"config: {result['config_path']}",
+        f"contract: {result['contract_path']}",
         f"workflow: {result['workflow']}",
         f"instance: {result['instance_name']}",
         f"repo-path: {result['repo_path']}",
@@ -1548,7 +1563,7 @@ def configure_subcommands(parser: argparse.ArgumentParser) -> argparse.ArgumentP
 
     scaffold_cmd = sub.add_parser(
         "scaffold-workflow",
-        help="Create a new workflow root and starter config/workflow.yaml.",
+        help="Create a new workflow root and starter WORKFLOW.md.",
     )
     scaffold_cmd.add_argument(
         "--workflow-root",
@@ -1960,7 +1975,7 @@ def execute_workflow_command(raw_args: str) -> str:
     Single arg (workflow name): shows that workflow's ``--help``.
     Full invocation: routes through ``workflows.run_cli`` with
     ``require_workflow=<name>`` so the dispatcher pins the named module
-    regardless of what the workflow.yaml declares.
+    regardless of what the workflow contract declares.
     """
     workflow_root = resolve_default_workflow_root()
     parts = raw_args.strip().split() if raw_args else []

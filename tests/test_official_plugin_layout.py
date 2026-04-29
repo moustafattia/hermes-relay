@@ -74,7 +74,7 @@ def test_repo_root_tools_wrapper_dispatches_scaffold(tmp_path):
     )
 
     assert "daedalus error:" not in out, out
-    assert (workflow_root / "config" / "workflow.yaml").exists()
+    assert (workflow_root / "WORKFLOW.md").exists()
 
 
 def test_repo_root_workflows_wrapper_exposes_code_review_submodules():

@@ -8,14 +8,14 @@ This is the supported community install path for the first public release.
 - Hermes with plugin loading enabled
 - `python3` with `yaml` and `jsonschema` available
 - `systemd --user` for supervised active/shadow mode
-- the host CLIs required by the runtimes named in `workflow.yaml`
+- the host CLIs required by the runtimes named in `WORKFLOW.md`
 
 The bundled `code-review` template defaults to:
 
 - `acpx-codex` for the coder runtime
 - `claude-cli` for the internal reviewer runtime
 
-If your host does not have those runtimes, edit `workflow.yaml` before starting the service.
+If your host does not have those runtimes, edit `WORKFLOW.md` before starting the service.
 
 ## Install the plugin
 
@@ -58,7 +58,7 @@ This creates the supported instance layout:
 Edit:
 
 ```text
-~/.hermes/workflows/<owner>-<repo>-<workflow-type>/config/workflow.yaml
+~/.hermes/workflows/<owner>-<repo>-<workflow-type>/WORKFLOW.md
 ```
 
 At minimum, set:
@@ -66,6 +66,9 @@ At minimum, set:
 - `repository.local-path`
 - runtime kinds/models that exist on your host
 - any gates, webhooks, or observability settings your repo needs
+
+The YAML front matter is the structured config. The Markdown body below it is
+shared workflow policy that Daedalus prepends to its role-specific prompts.
 
 ## Initialize and verify
 
@@ -149,4 +152,4 @@ hermes plugins enable daedalus
 
 ## Legacy migration
 
-`scripts/migrate_config.py` is only for migrating older JSON configs into the new `workflow.yaml` shape. It is not the primary onboarding path for new installs.
+`scripts/migrate_config.py` is only for migrating older JSON configs into the new `WORKFLOW.md` shape. It is not the primary onboarding path for new installs.

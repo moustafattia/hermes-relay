@@ -59,10 +59,10 @@ def run_cli(
 ) -> int:
     """Read the workflow contract under ``workflow_root`` and dispatch.
 
-    When ``require_workflow`` is set, the dispatcher asserts that the YAML's
+    When ``require_workflow`` is set, the dispatcher asserts that the contract's
     ``workflow:`` field matches before dispatching. Used by the per-workflow
     direct form (``python3 -m workflows.code_review ...``) to pin the module
-    regardless of what the YAML declares.
+    regardless of what the contract declares.
     """
     contract = load_workflow_contract(workflow_root)
     config_path = contract.source_path

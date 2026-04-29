@@ -120,7 +120,7 @@ Every code change that affects operator-facing behavior must update docs:
 | New slash command | `docs/operator/slash-commands.md`, `docs/operator/cheat-sheet.md` |
 | New concept | `docs/concepts/<new-concept>.md`, `docs/architecture.md` |
 | Schema change | `docs/concepts/lanes.md`, `docs/concepts/actions.md` |
-| Config change | `daedalus/workflows/code_review/workflow.template.yaml`, `docs/examples/code-review.workflow.yaml`, `docs/concepts/hot-reload.md`, `docs/operator/cheat-sheet.md` |
+| Config change | `daedalus/workflows/code_review/workflow.template.md`, `docs/examples/code-review.workflow.md`, `docs/concepts/hot-reload.md`, `docs/operator/cheat-sheet.md` |
 | Rename/refactor | All docs + ADR in `docs/adr/` |
 
 ---

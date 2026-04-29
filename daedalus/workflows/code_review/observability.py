@@ -4,11 +4,11 @@ Resolution precedence (highest first):
 
 1. Override file at ``<override_dir>/observability-overrides.json`` (per-workflow,
    set by the operator via the ``/daedalus set-observability`` slash command).
-2. ``observability:`` block in ``workflow.yaml``.
+2. ``observability:`` block in the workflow contract (normally ``WORKFLOW.md``).
 3. Hardcoded defaults (everything off).
 
 The override file is canonical for "right now this workflow's observability is X"
-without forcing an edit-and-redeploy cycle on workflow.yaml.
+without forcing an edit-and-redeploy cycle on the workflow contract.
 """
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ OVERRIDE_FILENAME = "observability-overrides.json"
 
 # The default include-events whitelist matches design spec §5 — these are the
 # six lifecycle transitions that are interesting to a human reader of the
-# ticket. An empty list (explicitly set in workflow.yaml or override) means
+# ticket. An empty list (explicitly set in the workflow contract or override) means
 # "firehose, render every audit action" — useful for debugging only.
 _DEFAULT_INCLUDE_EVENTS = [
     "dispatch-implementation-turn",

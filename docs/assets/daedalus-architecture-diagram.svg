@@ -35,7 +35,7 @@
   <text x="600" y="155" fill="#94a3b8" font-family="monospace" font-size="9" text-anchor="middle">/daedalus commands</text>
 
   <rect x="860" y="115" width="140" height="55" rx="8" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
-  <text x="930" y="138" fill="white" font-family="monospace" font-size="12" font-weight="600" text-anchor="middle">workflow.yaml</text>
+  <text x="930" y="138" fill="white" font-family="monospace" font-size="12" font-weight="600" text-anchor="middle">WORKFLOW.md</text>
   <text x="930" y="155" fill="#94a3b8" font-family="monospace" font-size="9" text-anchor="middle">Hot-reload config</text>
 
   <rect x="50" y="200" width="520" height="420" rx="16" fill="rgba(8,51,68,0.08)" stroke="#22d3ee" stroke-width="2" stroke-dasharray="12,6"/>

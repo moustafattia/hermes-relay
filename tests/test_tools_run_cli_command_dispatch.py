@@ -112,4 +112,4 @@ def test_run_cli_command_dispatches_scaffold_workflow(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "unknown daedalus command" not in out, out
     assert "scaffolded workflow root" in out
-    assert (root / "config" / "workflow.yaml").exists()
+    assert (root / "WORKFLOW.md").exists()

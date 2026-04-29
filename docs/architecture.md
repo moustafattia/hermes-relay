@@ -26,7 +26,7 @@
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         EXTERNAL TRIGGERS                                   │
-│   GitHub Issue (#42)    Operator (/daedalus)    workflow.yaml (hot-reload)  │
+│   GitHub Issue (#42)    Operator (/daedalus)    WORKFLOW.md (hot-reload)    │
 └─────────────────────────────────────────────────────────────────────────────┘
          │                       │                       │
          ▼                       ▼                       ▼
@@ -163,7 +163,7 @@ Never reconstruct current state by replaying events. That's what the `lanes` tab
 
 ```mermaid
 flowchart TD
-    A[tick begins] --> B{workflow.yaml changed?}
+    A[tick begins] --> B{workflow contract changed?}
     B -- no --> C[reuse last ConfigSnapshot]
     B -- yes --> D[parse + validate]
     D -- ok --> E[swap AtomicRef]
@@ -174,7 +174,7 @@ flowchart TD
     G --> H
 ```
 
-A bad `workflow.yaml` edit is **ignored**, not fatal. The next valid save picks up automatically.
+A bad `WORKFLOW.md` edit is **ignored**, not fatal. The next valid save picks up automatically.
 
 ### 5. Recovery Is Automatic
 

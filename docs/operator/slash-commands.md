@@ -137,7 +137,7 @@ Daedalus service
 | Command | What it does |
 |---|---|
 | `/daedalus init` | Init/migrate the runtime DB (idempotent) |
-| `/daedalus scaffold-workflow` | Create a new workflow root named `<owner>-<repo>-<workflow-type>` with a starter `config/workflow.yaml` |
+| `/daedalus scaffold-workflow` | Create a new workflow root named `<owner>-<repo>-<workflow-type>` with a starter `WORKFLOW.md` |
 | `/daedalus ingest-live` | Pull workflow CLI status into the ledger |
 | `/daedalus heartbeat` | Refresh the runtime lease |
 | `/daedalus request-active-actions` | Inspect what *would* be dispatched on the next tick |

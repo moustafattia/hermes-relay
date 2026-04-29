@@ -130,13 +130,8 @@ def _reset_workflows_module_cache():
 
 def _write_workflow_markdown(workspace_root: Path, *, workflow_name: str = "demo-wf", body: str = "Prompt body") -> None:
     front_matter = {
-        "daedalus": {
-            "prompt-role": "coder",
-            "workflow-config": {
-                "workflow": workflow_name,
-                "schema-version": 1,
-            },
-        },
+        "workflow": workflow_name,
+        "schema-version": 1,
     }
     (workspace_root / "WORKFLOW.md").write_text(
         "---\n" + yaml.safe_dump(front_matter, sort_keys=False) + "---\n\n" + body + "\n",

@@ -83,9 +83,9 @@ def resolve_inline_prompt_template(
 ) -> str | None:
     """Return an inline prompt override from ``workspace.config.prompts``.
 
-    Explicit file paths still win. Inline prompts are the bridge used by the
-    ``WORKFLOW.md`` compatibility loader, which injects the Markdown body into
-    ``prompts.<role>``.
+    Explicit file paths still win. Inline prompts remain available for role-
+    specific overrides, but the shared ``WORKFLOW.md`` body now flows through
+    ``workflow-policy`` instead.
     """
     if agent_cfg.get("prompt"):
         return None
@@ -100,6 +100,32 @@ def resolve_inline_prompt_template(
             f"workspace.config.prompts[{role!r}] must be a string"
         )
     return template
+
+
+def resolve_workflow_policy(*, workspace) -> str | None:
+    policy = (workspace.config or {}).get("workflow-policy")
+    if policy is None:
+        return None
+    if not isinstance(policy, str):
+        raise DispatchConfigError("workspace.config['workflow-policy'] must be a string")
+    return policy
+
+
+def _compose_with_workflow_policy(prompt_text: str, workflow_policy: str | None) -> str:
+    policy = str(workflow_policy or "").strip()
+    if not policy:
+        return prompt_text
+    return "\n".join(
+        [
+            "# Shared Workflow Policy",
+            "",
+            policy,
+            "",
+            "# Role-Specific Instructions",
+            "",
+            prompt_text.lstrip(),
+        ]
+    )
 
 
 def _materialize_prompt(*, worktree: Path, role: str, tier: str | None, rendered_text: str) -> Path:
@@ -182,6 +208,10 @@ def dispatch_agent(
             workspace=workspace, role=role, agent_cfg=cfg,
         )
         template_text = template_path.read_text(encoding="utf-8")
+    template_text = _compose_with_workflow_policy(
+        template_text,
+        resolve_workflow_policy(workspace=workspace),
+    )
     rendered_text = template_text.format(**(prompt_kwargs or {}))
 
     command = _resolve_command(agent_cfg=cfg, runtime_cfg=runtime_cfg)

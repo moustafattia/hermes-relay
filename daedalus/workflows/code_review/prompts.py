@@ -11,6 +11,25 @@ def _load_template(name: str) -> str:
     return (_PROMPT_BUNDLE / f"{name}.md").read_text(encoding="utf-8")
 
 
+def apply_workflow_policy(prompt_text: str, workflow_policy: str | None) -> str:
+    """Prefix shared workflow policy ahead of role-specific instructions."""
+    policy = str(workflow_policy or "").strip()
+    if not policy:
+        return prompt_text
+    body = prompt_text.lstrip()
+    return "\n".join(
+        [
+            "# Shared Workflow Policy",
+            "",
+            policy,
+            "",
+            "# Role-Specific Instructions",
+            "",
+            body,
+        ]
+    )
+
+
 """Workflow prompt rendering helpers.
 
 This slice extracts deterministic prompt construction from the legacy wrapper so
@@ -92,6 +111,7 @@ def render_implementation_dispatch_prompt(
     open_pr: dict[str, Any] | None,
     action: str,
     workflow_state: str | None,
+    workflow_policy: str | None = None,
 ) -> str:
     issue_body = (issue_details or {}).get("body") or "No issue body provided. Use the title plus existing repo context honestly."
     compact_turn = action in {"continue-session", "poke-session"}
@@ -137,7 +157,7 @@ def render_implementation_dispatch_prompt(
             issue_body.strip() or "No issue body provided.",
         ])
 
-    return _load_template("coder").format(
+    prompt_text = _load_template("coder").format(
         issue_number=issue.get("number"),
         issue_title=issue.get("title"),
         issue_url=issue.get("url"),
@@ -148,6 +168,7 @@ def render_implementation_dispatch_prompt(
         action_and_workflow_block=action_and_workflow_block,
         compact_or_issue_block=compact_or_issue_block,
     )
+    return apply_workflow_policy(prompt_text, workflow_policy)
 
 
 def render_external_reviewer_repair_handoff_prompt(
@@ -159,13 +180,14 @@ def render_external_reviewer_repair_handoff_prompt(
     lane_state_path: Path | None,
     pr_url: str | None,
     external_reviewer_agent_name: str,
+    workflow_policy: str | None = None,
 ) -> str:
     review = external_review or {}
     must_fix = [item.get("summary", "") for item in (repair_brief or {}).get("mustFix", []) if item.get("summary")][:8]
     should_fix = [item.get("summary", "") for item in (repair_brief or {}).get("shouldFix", []) if item.get("summary")][:8]
     must_fix_lines = "\n".join([f"- {item}" for item in must_fix] or ["- none recorded"])
     should_fix_lines = "\n".join([f"- {item}" for item in should_fix] or ["- none recorded"])
-    return _load_template("external-reviewer-repair-handoff").format(
+    prompt_text = _load_template("external-reviewer-repair-handoff").format(
         external_reviewer_agent_name=external_reviewer_agent_name,
         issue_number=(issue or {}).get("number"),
         issue_title=(issue or {}).get("title"),
@@ -177,6 +199,7 @@ def render_external_reviewer_repair_handoff_prompt(
         must_fix_lines=must_fix_lines,
         should_fix_lines=should_fix_lines,
     )
+    return apply_workflow_policy(prompt_text, workflow_policy)
 
 
 def render_claude_repair_handoff_prompt(
@@ -187,13 +210,14 @@ def render_claude_repair_handoff_prompt(
     lane_memo_path: Path | None,
     lane_state_path: Path | None,
     internal_reviewer_agent_name: str,
+    workflow_policy: str | None = None,
 ) -> str:
     review = internal_review or {}
     must_fix = [item.get("summary", "") for item in (repair_brief or {}).get("mustFix", []) if item.get("summary")][:8]
     should_fix = [item.get("summary", "") for item in (repair_brief or {}).get("shouldFix", []) if item.get("summary")][:8]
     must_fix_lines = "\n".join([f"- {item}" for item in must_fix] or ["- none recorded"])
     should_fix_lines = "\n".join([f"- {item}" for item in should_fix] or ["- none recorded"])
-    return _load_template("repair-handoff").format(
+    prompt_text = _load_template("repair-handoff").format(
         internal_reviewer_agent_name=internal_reviewer_agent_name,
         issue_number=(issue or {}).get("number"),
         issue_title=(issue or {}).get("title"),
@@ -204,6 +228,7 @@ def render_claude_repair_handoff_prompt(
         must_fix_lines=must_fix_lines,
         should_fix_lines=should_fix_lines,
     )
+    return apply_workflow_policy(prompt_text, workflow_policy)
 
 
 def render_inter_review_agent_prompt(
@@ -213,8 +238,9 @@ def render_inter_review_agent_prompt(
     lane_memo_path: Path | None,
     lane_state_path: Path | None,
     head_sha: str,
+    workflow_policy: str | None = None,
 ) -> str:
-    return _load_template("internal-reviewer").format(
+    prompt_text = _load_template("internal-reviewer").format(
         worktree=worktree,
         head_sha=head_sha,
         issue_number=issue.get("number"),
@@ -223,3 +249,4 @@ def render_inter_review_agent_prompt(
         lane_memo_line=f"Lane memo: {lane_memo_path}" if lane_memo_path else "Lane memo: none",
         lane_state_line=f"Lane state: {lane_state_path}" if lane_state_path else "Lane state: none",
     )
+    return apply_workflow_policy(prompt_text, workflow_policy)

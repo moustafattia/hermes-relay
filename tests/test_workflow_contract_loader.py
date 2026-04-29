@@ -4,6 +4,7 @@ import pytest
 import yaml
 
 from workflows.contract import (
+    WORKFLOW_POLICY_KEY,
     WorkflowContractError,
     find_workflow_contract_path,
     load_workflow_contract,
@@ -38,14 +39,8 @@ def _native_config() -> dict:
 
 
 def _workflow_markdown(config: dict, *, prompt_role: str = "coder", body: str = "You are the workflow prompt.") -> str:
-    front_matter = {
-        "tracker": {"kind": "github-issues"},
-        "daedalus": {
-            "prompt-role": prompt_role,
-            "workflow-config": config,
-        },
-    }
-    return "---\n" + yaml.safe_dump(front_matter, sort_keys=False) + "---\n\n" + body + "\n"
+    del prompt_role
+    return "---\n" + yaml.safe_dump(config, sort_keys=False) + "---\n\n" + body + "\n"
 
 
 def test_load_workflow_contract_reads_yaml_mapping(tmp_path):
@@ -78,26 +73,38 @@ def test_load_workflow_contract_reads_markdown_and_injects_prompt(tmp_path):
 
     assert contract.source_path == path
     assert contract.config["workflow"] == "code-review"
-    assert contract.config["prompts"]["internal-reviewer"] == "Review the lane strictly."
+    assert contract.config[WORKFLOW_POLICY_KEY] == "Review the lane strictly."
     assert contract.prompt_template == "Review the lane strictly."
 
 
-def test_load_workflow_contract_markdown_requires_daedalus_workflow_config(tmp_path):
+def test_load_workflow_contract_markdown_body_becomes_workflow_policy(tmp_path):
     path = tmp_path / "WORKFLOW.md"
     path.write_text(
-        "---\ntracker:\n  kind: linear\n---\n\nPrompt body.\n",
+        _workflow_markdown(_native_config(), body="Prompt body."),
         encoding="utf-8",
     )
 
-    with pytest.raises(WorkflowContractError, match="daedalus.workflow-config"):
+    contract = load_workflow_contract_file(path)
+
+    assert contract.config[WORKFLOW_POLICY_KEY] == "Prompt body."
+
+
+def test_load_workflow_contract_markdown_rejects_duplicate_policy_sources(tmp_path):
+    payload = _native_config()
+    payload[WORKFLOW_POLICY_KEY] = "front matter policy"
+    path = tmp_path / "WORKFLOW.md"
+    path.write_text(_workflow_markdown(payload, body="body policy"), encoding="utf-8")
+
+    with pytest.raises(WorkflowContractError, match="workflow-policy"):
         load_workflow_contract_file(path)
 
 
-def test_find_workflow_contract_path_prefers_yaml_when_both_exist(tmp_path):
+def test_find_workflow_contract_path_prefers_markdown_when_both_exist(tmp_path):
     root = tmp_path / "wf"
     (root / "config").mkdir(parents=True)
     yaml_path = root / "config" / "workflow.yaml"
     yaml_path.write_text(yaml.safe_dump(_native_config()), encoding="utf-8")
-    (root / "WORKFLOW.md").write_text(_workflow_markdown(_native_config()), encoding="utf-8")
+    markdown_path = root / "WORKFLOW.md"
+    markdown_path.write_text(_workflow_markdown(_native_config()), encoding="utf-8")
 
-    assert find_workflow_contract_path(root) == yaml_path
+    assert find_workflow_contract_path(root) == markdown_path

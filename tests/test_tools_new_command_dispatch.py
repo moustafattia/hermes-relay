@@ -86,4 +86,4 @@ def test_scaffold_workflow_dispatched_not_falling_through_to_unknown(tmp_path):
     )
     assert "unknown daedalus command" not in out, out
     assert "scaffolded workflow root" in out
-    assert (root / "config" / "workflow.yaml").exists()
+    assert (root / "WORKFLOW.md").exists()

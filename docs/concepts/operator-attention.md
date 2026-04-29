@@ -13,7 +13,7 @@ A lane enters `operator_attention_required` when **either** threshold is crossed
 | **Failure retry budget exhausted** | 5 retries | The same action has failed 5 times without success. |
 | **No-progress tick budget exhausted** | 5 ticks | The lane has ticked 5 times without making any forward progress (new commits, new reviews, new state). |
 
-Both thresholds are configurable in `workflow.yaml`:
+Both thresholds are configurable in `WORKFLOW.md`:
 
 ```yaml
 policy:

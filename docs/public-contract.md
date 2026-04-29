@@ -6,8 +6,8 @@ This document defines the stability boundary for the first public Daedalus relea
 
 These are the surfaces we should treat as `v1` public contract:
 
-- `config/workflow.yaml` for workflow instance configuration
-- `WORKFLOW.md` compatibility loading for `workflow: code-review`, using `daedalus.workflow-config`
+- `WORKFLOW.md` at the workflow root for workflow instance configuration
+- legacy `config/workflow.yaml` loading for existing instances
 - `hermes plugins install attmous/daedalus --enable`
 - the `hermes_agent.plugins` entry point name `daedalus`
 - `hermes daedalus scaffold-workflow`
@@ -41,9 +41,8 @@ Additional workflow types should not be advertised as public contract until they
 
 ## Contract preference
 
-The preferred public path is still `config/workflow.yaml`, because it is what
-the scaffold command generates and what the operator docs teach first.
+The preferred and scaffolded public path is `WORKFLOW.md`.
 
-`WORKFLOW.md` support exists to improve Symphony compatibility, but it is
-currently a compatibility layer over the native schema, not a replacement for
-the scaffolded YAML path.
+`config/workflow.yaml` remains loadable for legacy workflow roots, but new
+docs, templates, and operators should treat it as migration input rather than
+the primary contract.

@@ -1,10 +1,4 @@
-# Public baseline for the bundled `code-review` workflow.
-#
-# Copy this file to:
-#   ~/.hermes/workflows/<owner>-<repo>-<workflow-type>/config/workflow.yaml
-#
-# All relative paths below are resolved from <workflow-root>.
-
+---
 workflow: code-review
 schema-version: 1
 
@@ -18,8 +12,6 @@ repository:
   active-lane-label: active-lane
 
 runtimes:
-  # These runtime kinds are host prerequisites. Change them if your
-  # environment uses a different adapter mix.
   coder-runtime:
     kind: acpx-codex
     session-idle-freshness-seconds: 900
@@ -73,7 +65,6 @@ storage:
   health: memory/workflow-health.json
   audit-log: memory/workflow-audit.jsonl
 
-# Optional operator-facing blocks.
 lane-selection:
   exclude-labels:
     - blocked
@@ -82,22 +73,22 @@ lane-selection:
 observability:
   github-comments:
     enabled: false
+---
 
-# Optional HTTP status surface.
-# server:
-#   port: 8765
-#   bind: 127.0.0.1
+# Workflow Policy
 
-# Optional outbound notifications.
-# webhooks:
-#   - name: ops-webhook
-#     kind: http-json
-#     enabled: true
-#     url: https://example.com/daedalus
-#     events:
-#       - daedalus.turn_completed
-#       - daedalus.operator_attention_transition
-#     headers:
-#       Authorization: Bearer replace-me
-#     timeout-seconds: 5
-#     retry-count: 1
+Daedalus runs the `code-review` workflow for the repository configured above.
+
+Shared rules:
+
+- Keep scope narrow to the active issue and current lane state.
+- Prefer small, reviewable diffs over speculative refactors.
+- Run focused validation and report it honestly.
+- Stop and surface blockers instead of guessing.
+- Do not publish generated artifacts or unrelated files.
+
+Role intent:
+
+- `coder`: implement the next correct change and leave a clean handoff.
+- `internal-reviewer`: review correctness, regressions, and test honesty before publish.
+- `external-reviewer`: provide an optional second-pass review when enabled.

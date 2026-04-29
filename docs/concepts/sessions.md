@@ -55,7 +55,7 @@ stateDiagram-v2
 ### `hermes-agent` (one-shot)
 
 - No persistent session.
-- Requires a `command:` override in `workflow.yaml`.
+- Requires a `command:` override in `WORKFLOW.md`.
 - `assess_health` always returns healthy.
 - `last_activity_ts` records subprocess start/end timestamps.
 

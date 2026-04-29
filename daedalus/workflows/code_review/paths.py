@@ -190,9 +190,9 @@ def workflow_cli_argv(workflow_root: Path, *command_args: str) -> list[str]:
 def _find_workflow_root(start: Path) -> Path | None:
     path = start.expanduser().resolve()
     for candidate in (path, *path.parents):
-        if workflow_config_path(candidate).exists():
-            return candidate
         if workflow_markdown_path(candidate).exists() and _is_discoverable_markdown_workflow_root(candidate):
+            return candidate
+        if workflow_config_path(candidate).exists():
             return candidate
     return None
 
@@ -218,8 +218,8 @@ def resolve_default_workflow_root(
 
     plugin_dir = plugin_root_path(plugin_dir=plugin_dir)
     repo_parent = plugin_dir.parent.resolve()
-    if workflow_config_path(repo_parent).exists():
-        return repo_parent
     if workflow_markdown_path(repo_parent).exists() and _is_discoverable_markdown_workflow_root(repo_parent):
+        return repo_parent
+    if workflow_config_path(repo_parent).exists():
         return repo_parent
     return cwd_path

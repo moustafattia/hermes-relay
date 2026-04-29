@@ -53,6 +53,26 @@ def test_render_implementation_dispatch_prompt_includes_issue_summary_for_restar
     assert 'The local branch has already passed the Claude pre-publish gate.' in result
 
 
+def test_render_implementation_dispatch_prompt_prepends_shared_workflow_policy():
+    prompts_module = load_module("daedalus_workflows_code_review_prompts_test", "workflows/code_review/prompts.py")
+
+    result = prompts_module.render_implementation_dispatch_prompt(
+        issue={"number": 224, "title": "Issue 224", "url": "https://example.com/issues/224"},
+        issue_details={"body": "Body."},
+        worktree=Path('/tmp/issue-224'),
+        lane_memo_path=None,
+        lane_state_path=None,
+        open_pr=None,
+        action='restart-session',
+        workflow_state='implementing_local',
+        workflow_policy='Never widen scope.',
+    )
+
+    assert '# Shared Workflow Policy' in result
+    assert 'Never widen scope.' in result
+    assert '# Role-Specific Instructions' in result
+
+
 def test_render_claude_repair_handoff_prompt_includes_review_summary_and_fix_lists():
     prompts_module = load_module("daedalus_workflows_code_review_prompts_test", "workflows/code_review/prompts.py")
 
@@ -91,6 +111,23 @@ def test_render_external_reviewer_repair_handoff_prompt_includes_pr_url_and_guar
     assert 'External_Reviewer_Agent summary:' in result
     assert '- Tighten edge case' in result
     assert 'Do not publish .codex artifacts.' in result
+
+
+def test_render_inter_review_agent_prompt_can_prepend_shared_workflow_policy(tmp_path):
+    prompts_module = load_module("daedalus_workflows_code_review_prompts_test", "workflows/code_review/prompts.py")
+
+    result = prompts_module.render_inter_review_agent_prompt(
+        issue={"number": 224, "title": "Issue 224", "url": "https://example.com/issues/224"},
+        worktree=tmp_path,
+        lane_memo_path=None,
+        lane_state_path=None,
+        head_sha="abc123",
+        workflow_policy="Do not guess.",
+    )
+
+    assert '# Shared Workflow Policy' in result
+    assert 'Do not guess.' in result
+    assert 'Scope: local-prepublish only' in result
 
 
 def test_summarize_validation_and_render_lane_memo_capture_checks_progress_and_fix_lists():

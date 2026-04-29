@@ -7,7 +7,7 @@ Symphony §8.5. A wedged worker that's still holding a lease but producing no si
 A stall is detected from two sides:
 
 1. **Liveness** — `Runtime.last_activity_ts()` returns a monotonic timestamp the runtime *most recently* updated. Each adapter calls `_record_activity()` **before** the blocking `_run()` and again after, so a long invocation isn't classified as idle mid-flight.
-2. **Threshold** — `stall.timeout_ms` in `workflow.yaml` (default 300 000 ms = 5 minutes). Anything older than that is considered stalled.
+2. **Threshold** — `stall.timeout_ms` in `WORKFLOW.md` (default 300 000 ms = 5 minutes). Anything older than that is considered stalled.
 
 If a runtime *doesn't* implement `last_activity_ts`, the reconciler skips it entirely. That's the explicit opt-out — never fall back to `started_at_monotonic`, because every long-running adapter would look stalled forever.
 

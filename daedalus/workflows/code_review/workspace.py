@@ -15,7 +15,7 @@ from workflows.code_review.runtimes import build_runtimes
 
 
 def _derive_lane_selection_cfg(yaml_cfg, *, active_lane_label):
-    """Synthesize the parsed lane-selection config from raw workflow.yaml.
+    """Synthesize the parsed lane-selection config from the raw workflow config.
 
     Lazy-import to avoid a circular-import at module load (workspace is the
     central bootstrap site).
@@ -35,7 +35,7 @@ def _derive_lane_selection_cfg(yaml_cfg, *, active_lane_label):
 
 
 def _yaml_to_legacy_view(yaml_cfg: dict, workspace_root: "Path | None" = None) -> dict:
-    """Project workflow.yaml onto the internal workspace config shape.
+    """Project workflow config onto the internal workspace config shape.
 
     workspace_root must be supplied so that relative storage paths (e.g.
     ``memory/workflow-status.json``) are anchored to the workflow root dir
@@ -437,7 +437,7 @@ def make_workspace(*, workspace_root: Path, config: dict[str, Any]) -> SimpleNam
 
     workspace_root = Path(workspace_root).resolve()
 
-    # Detect workflow.yaml shape (top-level `workflow:` + `runtimes:` +
+    # Detect workflow-contract shape (top-level `workflow:` + `runtimes:` +
     # `agents:`) and project it onto the internal config view the existing
     # implementation body still consumes.
     if "workflow" in config and "runtimes" in config and "agents" in config:
@@ -445,6 +445,7 @@ def make_workspace(*, workspace_root: Path, config: dict[str, Any]) -> SimpleNam
         config = _yaml_to_legacy_view(config, workspace_root=workspace_root)
     else:
         yaml_cfg = None
+    workflow_policy = str((yaml_cfg or {}).get("workflow-policy") or "").strip()
 
     # -- paths -----------------------------------------------------------
     repo_path = Path(config["repoPath"])
@@ -619,7 +620,8 @@ def make_workspace(*, workspace_root: Path, config: dict[str, Any]) -> SimpleNam
         # --- workspace globals ---
         WORKSPACE=workspace_root,
         CONFIG=config,
-        DEFAULT_CONFIG_PATH=workspace_root / DEFAULT_YAML_CONFIG_FILENAME,
+        WORKFLOW_POLICY=workflow_policy,
+        DEFAULT_CONFIG_PATH=workspace_root / DEFAULT_WORKFLOW_MARKDOWN_FILENAME,
         SESSIONS_STATE_PATH=sessions_state_path,
         REPO_PATH=repo_path,
         REPO_SLUG=_repo_slug,
@@ -1324,26 +1326,14 @@ def _install_wrapper_adapter_shims(ns: SimpleNamespace) -> None:
         )
 
     def _render_inter_review_agent_prompt(*, issue, worktree, lane_memo_path, lane_state_path, head_sha):
-        lines = [
-            'You are reviewing the unpublished local lane head as a strict pre-publish code review gate.',
-            f'Repository: {worktree}',
-            f'Target local head SHA: {head_sha}',
-            'Scope: local-prepublish only. Review the actual current local HEAD in this worktree.',
-            f'Issue: #{issue.get("number")} {issue.get("title")}',
-            f'Issue URL: {issue.get("url")}',
-            f'Lane memo: {lane_memo_path}' if lane_memo_path else 'Lane memo: none',
-            f'Lane state: {lane_state_path}' if lane_state_path else 'Lane state: none',
-            'Read the lane memo/state if present before reviewing.',
-            'Focus on correctness, regressions, test honesty, and whether the code is actually ready to publish.',
-            'Return JSON only, no markdown fences, with this exact schema:',
-            '{"verdict":"PASS_CLEAN"|"PASS_WITH_FINDINGS"|"REWORK","summary":"short paragraph","blockingFindings":["..."],"majorConcerns":["..."],"minorSuggestions":["..."],"requiredNextAction":"string or null"}',
-            'Rules:',
-            '- Use REWORK only for blocking issues that must be fixed before publish.',
-            '- Use PASS_WITH_FINDINGS for non-blocking but real concerns worth recording.',
-            '- Use PASS_CLEAN only if you genuinely found nothing worth recording.',
-            '- Be concise and tie findings to the actual current local diff/head.',
-        ]
-        return '\n'.join(lines)
+        return ns._load_adapter_prompts_module().render_inter_review_agent_prompt(
+            issue=issue,
+            worktree=worktree,
+            lane_memo_path=lane_memo_path,
+            lane_state_path=lane_state_path,
+            head_sha=head_sha,
+            workflow_policy=ns.WORKFLOW_POLICY,
+        )
 
     def _run_inter_review_agent_review(*, issue, worktree, lane_memo_path, lane_state_path, head_sha):
         adapter_reviews = ns._load_adapter_reviews_module()
@@ -1388,6 +1378,7 @@ def _install_wrapper_adapter_shims(ns: SimpleNamespace) -> None:
             open_pr=open_pr,
             action=action,
             workflow_state=workflow_state,
+            workflow_policy=ns.WORKFLOW_POLICY,
         )
 
     def _normalize_implementation_for_active_lane(implementation, *, active_lane, open_pr):
@@ -1610,6 +1601,7 @@ def _install_wrapper_adapter_shims(ns: SimpleNamespace) -> None:
             lane_state_path=lane_state_path,
             pr_url=pr_url,
             external_reviewer_agent_name=ns.EXTERNAL_REVIEWER_AGENT_NAME,
+            workflow_policy=ns.WORKFLOW_POLICY,
         )
 
     def build_claude_repair_handoff_payload(*, session_action, issue, internal_review, repair_brief, lane_memo_path, lane_state_path, now_iso):
@@ -1640,6 +1632,7 @@ def _install_wrapper_adapter_shims(ns: SimpleNamespace) -> None:
             lane_memo_path=lane_memo_path,
             lane_state_path=lane_state_path,
             internal_reviewer_agent_name=ns.INTERNAL_REVIEWER_AGENT_NAME,
+            workflow_policy=ns.WORKFLOW_POLICY,
         )
 
     def _classify_lane_failure(*, implementation, reviews, preflight):

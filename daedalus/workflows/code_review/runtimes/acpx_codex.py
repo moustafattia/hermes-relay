@@ -159,7 +159,7 @@ class AcpxCodexRuntime:
     ) -> str:
         """Execute a fully-formed argv against this runtime's working dir.
 
-        Used when an agent role supplies a `command:` override in workflow.yaml.
+        Used when an agent role supplies a `command:` override in the workflow contract.
         Session plumbing (ensure/close) is the caller's responsibility.
         """
         completed = self._run(command_argv, cwd=worktree)
