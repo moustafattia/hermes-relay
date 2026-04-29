@@ -1,7 +1,7 @@
-"""Hot-reload of workflow.yaml (Symphony §6.2).
+"""Hot-reload of the workflow contract (Symphony §6.2).
 
 `ConfigWatcher.poll()` is called every tick. It mtime-checks the
-workflow file; on change, reparses + validates and swaps the
+workflow contract file; on change, reparses + validates and swaps the
 `AtomicRef[ConfigSnapshot]`. On failure, the last-known-good snapshot
 is kept and `daedalus.config_reload_failed` is emitted.
 """
@@ -16,15 +16,16 @@ import yaml
 from jsonschema import Draft7Validator
 from jsonschema.exceptions import ValidationError as _JSValidationError
 
+from workflows.contract import WorkflowContractError, load_workflow_contract_file
 from workflows.code_review.config_snapshot import AtomicRef, ConfigSnapshot
 
 
 class ParseError(Exception):
-    """Raised when workflow.yaml cannot be parsed as YAML."""
+    """Raised when the workflow contract cannot be parsed or projected."""
 
 
 class ValidationError(Exception):
-    """Raised when workflow.yaml parses but violates schema.yaml."""
+    """Raised when the workflow contract parses but violates schema.yaml."""
 
 
 _SCHEMA_PATH = Path(__file__).resolve().parent / "schema.yaml"
@@ -34,20 +35,18 @@ def _load_schema() -> dict:
     return yaml.safe_load(_SCHEMA_PATH.read_text(encoding="utf-8"))
 
 
-def parse_and_validate(workflow_yaml_path: Path) -> ConfigSnapshot:
-    """Parse `workflow.yaml`, validate against `schema.yaml`, return snapshot.
+def parse_and_validate(workflow_contract_path: Path) -> ConfigSnapshot:
+    """Parse the workflow contract, validate against `schema.yaml`, return snapshot.
 
     Raises:
-        ParseError: yaml.YAMLError or non-dict top-level.
+        ParseError: contract parse/project errors.
         ValidationError: schema validation failure.
     """
     try:
-        text = workflow_yaml_path.read_text(encoding="utf-8")
-        config = yaml.safe_load(text)
-    except yaml.YAMLError as exc:
-        raise ParseError(f"YAML parse error: {exc}") from exc
-    if not isinstance(config, dict):
-        raise ParseError(f"workflow.yaml top-level must be a mapping, got {type(config).__name__}")
+        contract = load_workflow_contract_file(workflow_contract_path)
+    except WorkflowContractError as exc:
+        raise ParseError(str(exc)) from exc
+    config = contract.config
 
     try:
         Draft7Validator(_load_schema()).validate(config)
@@ -55,7 +54,7 @@ def parse_and_validate(workflow_yaml_path: Path) -> ConfigSnapshot:
         raise ValidationError(f"schema validation failed: {exc.message}") from exc
 
     prompts = config.get("prompts") or {}
-    st = workflow_yaml_path.stat()
+    st = contract.source_path.stat()
     return ConfigSnapshot(
         config=config,
         prompts=prompts,
@@ -69,7 +68,7 @@ def parse_and_validate(workflow_yaml_path: Path) -> ConfigSnapshot:
 class ConfigWatcher:
     """mtime-polled config-reload driver. Call `.poll()` once per tick."""
 
-    workflow_yaml_path: Path
+    workflow_contract_path: Path
     snapshot_ref: AtomicRef[ConfigSnapshot]
     emit_event: Callable[[str, dict], None]
     _last_key: tuple[float, int] = (0.0, 0)
@@ -93,7 +92,7 @@ class ConfigWatcher:
         or mtime-preserving copies (NFS, rsync -t, overlayfs).
         """
         try:
-            st = self.workflow_yaml_path.stat()
+            st = self.workflow_contract_path.stat()
         except OSError:
             return  # file vanished mid-poll (atomic rename); keep last-known-good
         key = (st.st_mtime, st.st_size)
@@ -107,7 +106,7 @@ class ConfigWatcher:
         # An uncaught exception here would propagate out of poll() and crash
         # the watcher loop instead of preserving last-known-good config.
         try:
-            new_snapshot = parse_and_validate(self.workflow_yaml_path)
+            new_snapshot = parse_and_validate(self.workflow_contract_path)
         except (ParseError, ValidationError, OSError, UnicodeDecodeError) as exc:
             self.emit_event(
                 "daedalus.config_reload_failed",

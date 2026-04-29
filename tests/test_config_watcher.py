@@ -50,6 +50,16 @@ _VALID_YAML = textwrap.dedent("""\
 """)
 
 
+def _valid_workflow_markdown() -> str:
+    front_matter = textwrap.dedent(f"""\
+        daedalus:
+          prompt-role: coder
+          workflow-config:
+{textwrap.indent(_VALID_YAML, '            ')}
+    """)
+    return f"---\n{front_matter}---\n\nYou are the workflow prompt.\n"
+
+
 def test_parse_and_validate_returns_snapshot(tmp_path):
     from workflows.code_review.config_watcher import parse_and_validate
 
@@ -59,6 +69,17 @@ def test_parse_and_validate_returns_snapshot(tmp_path):
     assert snap.config["workflow"] == "code-review"
     assert snap.source_mtime == p.stat().st_mtime
     assert snap.loaded_at > 0
+
+
+def test_parse_and_validate_accepts_workflow_markdown(tmp_path):
+    from workflows.code_review.config_watcher import parse_and_validate
+
+    p = tmp_path / "WORKFLOW.md"
+    p.write_text(_valid_workflow_markdown())
+    snap = parse_and_validate(p)
+
+    assert snap.config["workflow"] == "code-review"
+    assert snap.prompts["coder"] == "You are the workflow prompt."
 
 
 def test_parse_and_validate_raises_on_yaml_syntax_error(tmp_path):

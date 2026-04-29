@@ -1,14 +1,14 @@
 # Hot-reload & per-tick preflight
 
-Symphony §6.2 + §6.3. The two halves of "edits to `workflow.yaml` should never crash the loop."
+Symphony §6.2 + §6.3. The two halves of "edits to the workflow contract should never crash the loop."
 
 ## §6.2 Hot-reload
 
-`workflow.yaml` is re-parsed and re-validated on every tick. The new config replaces the old one **only if** parse + validate both succeed. A bad edit keeps the previous good config alive — the next valid save picks up automatically.
+The workflow contract (`config/workflow.yaml` or `WORKFLOW.md`) is re-parsed and re-validated on every tick. The new config replaces the old one **only if** parse + validate both succeed. A bad edit keeps the previous good config alive — the next valid save picks up automatically.
 
 ```mermaid
 flowchart TD
-  A[tick begins] --> B[read workflow.yaml<br/>stat: mtime+size]
+  A[tick begins] --> B[read workflow contract<br/>stat: mtime+size]
   B --> C{key changed?}
   C -- no --> D[reuse last ConfigSnapshot]
   C -- yes --> E[parse + validate]
@@ -46,8 +46,8 @@ flowchart LR
 
 ### What preflight actually checks
 
-- `workflow.yaml` parses
-- `workflow.yaml` matches `schema.yaml`
+- The workflow contract parses
+- The projected workflow config matches `schema.yaml`
 - Every referenced runtime kind (`runtimes.<name>.kind`, `agents.external-reviewer.kind`) is registered
 - Lane-selection config, if present, is internally consistent
 

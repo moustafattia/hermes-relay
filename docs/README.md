@@ -8,6 +8,8 @@ Entry point for everything that won't fit on the [project landing page](../READM
 - **[operator/installation.md](operator/installation.md)** — the supported install, scaffold, verify, and supervise flow.
 - **[examples/code-review.workflow.yaml](examples/code-review.workflow.yaml)** — copyable public baseline for `config/workflow.yaml`.
 - **[public-contract.md](public-contract.md)** — the stability boundary for the first public release.
+- **[symphony-conformance.md](symphony-conformance.md)** — where Daedalus matches the current Symphony draft, and where it still differs.
+- **[security.md](security.md)** — the trust model, shell/network posture, and secret-handling expectations.
 
 ## Concepts
 
@@ -20,7 +22,7 @@ What each abstraction *means* — read these before reading code.
 | [Runtimes](concepts/runtimes.md) | The `claude-cli` / `acpx-codex` / `hermes-agent` adapters. |
 | [Events](concepts/events.md) | The append-only history. Symphony §10.4 taxonomy + `daedalus.*` namespace. |
 | [Stalls](concepts/stalls.md) | `last_activity_ts()` + `stall.timeout_ms` (Symphony §8.5). |
-| [Hot-reload & preflight](concepts/hot-reload.md) | `workflow.yaml` reload + per-tick preflight (Symphony §6.2 + §6.3). |
+| [Hot-reload & preflight](concepts/hot-reload.md) | Workflow-contract reload (`workflow.yaml` or `WORKFLOW.md`) + per-tick preflight (Symphony §6.2 + §6.3). |
 | [Shadow → active](concepts/shadow-active.md) | The promotion gate from observation to execution. |
 
 ## Operator surface
@@ -44,6 +46,8 @@ docs/
 ├── README.md                this file
 ├── architecture.md          big picture
 ├── public-contract.md       stable public surfaces for the first release
+├── symphony-conformance.md  current spec alignment vs. remaining gaps
+├── security.md              trust model + execution posture
 │
 ├── concepts/                "what does X mean" — one file per abstraction
 ├── examples/                copyable config baselines

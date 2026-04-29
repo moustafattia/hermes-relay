@@ -206,6 +206,8 @@ A **labeled issue** is the trigger. The **engine** ticks; for every active issue
 - **[docs/architecture.md](docs/architecture.md)** — the big picture, end to end.
 - **[docs/operator/installation.md](docs/operator/installation.md)** — the supported install, scaffold, verify, and supervise path.
 - **[docs/public-contract.md](docs/public-contract.md)** — the stability boundary for the first public release.
+- **[docs/symphony-conformance.md](docs/symphony-conformance.md)** — what is already Symphony-aligned, what is only partial, and what is still missing.
+- **[docs/security.md](docs/security.md)** — the trust model, shell/runtime posture, and secret-handling expectations.
 - **[docs/concepts/](docs/concepts/)** — short explainers for each moving part: lanes, leases, runtimes, events, hot-reload, stalls.
 - **[docs/operator/](docs/operator/)** — day-to-day commands, the operator cheat sheet, the full slash-command catalogue.
 

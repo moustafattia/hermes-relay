@@ -49,6 +49,47 @@ def _write_workflow_yaml(workflow_root: Path, *, instance_name: str = "blueprint
     )
 
 
+def _write_workflow_markdown(workflow_root: Path, *, instance_name: str = "blueprint-engine") -> None:
+    config = {
+        "workflow": "code-review",
+        "schema-version": 1,
+        "instance": {"name": instance_name, "engine-owner": "hermes"},
+        "repository": {
+            "local-path": str(workflow_root / "repo"),
+            "github-slug": "owner/repo",
+            "active-lane-label": "active-lane",
+        },
+        "runtimes": {"acpx-codex": {"kind": "acpx-codex"}},
+        "agents": {
+            "coder": {"default": {"name": "Internal_Coder_Agent", "model": "gpt-5.3-codex", "runtime": "acpx-codex"}},
+            "internal-reviewer": {"name": "Internal_Reviewer_Agent", "model": "claude-sonnet-4-6", "runtime": "acpx-codex"},
+            "external-reviewer": {"enabled": True, "name": "External_Reviewer_Agent"},
+        },
+        "gates": {"internal-review": {}, "external-review": {}, "merge": {}},
+        "triggers": {"lane-selector": {"type": "github-label", "label": "active-lane"}},
+        "storage": {
+            "ledger": "memory/workflow-status.json",
+            "health": "memory/workflow-health.json",
+            "audit-log": "memory/workflow-audit.jsonl",
+        },
+    }
+    workflow_root.mkdir(parents=True, exist_ok=True)
+    (workflow_root / "WORKFLOW.md").write_text(
+        "---\n"
+        + yaml.safe_dump(
+            {
+                "daedalus": {
+                    "prompt-role": "coder",
+                    "workflow-config": config,
+                },
+            },
+            sort_keys=False,
+        )
+        + "---\n\nPrompt body\n",
+        encoding="utf-8",
+    )
+
+
 def test_runtime_paths_use_project_runtime_subdirs_when_present(tmp_path):
     paths_module = load_module("daedalus_workflows_code_review_paths_test", "workflows/code_review/paths.py")
     workflow_root = tmp_path / "blueprint"
@@ -112,6 +153,25 @@ def test_resolve_default_workflow_root_detects_cwd_ancestor_with_config(tmp_path
     assert resolved == workflow_root.resolve()
 
 
+def test_resolve_default_workflow_root_detects_cwd_ancestor_with_workflow_markdown(tmp_path):
+    paths_module = load_module("daedalus_workflows_code_review_paths_test", "workflows/code_review/paths.py")
+    workflow_root = tmp_path / "workflow-root"
+    nested = workflow_root / "workspace" / "repo" / "src"
+    _write_workflow_markdown(workflow_root)
+    (workflow_root / "runtime").mkdir(parents=True, exist_ok=True)
+    (workflow_root / "memory").mkdir(parents=True, exist_ok=True)
+    (workflow_root / "state").mkdir(parents=True, exist_ok=True)
+    nested.mkdir(parents=True)
+
+    resolved = paths_module.resolve_default_workflow_root(
+        plugin_dir=tmp_path / "plugin" / "daedalus",
+        env={},
+        cwd=nested,
+    )
+
+    assert resolved == workflow_root.resolve()
+
+
 def test_resolve_default_workflow_root_falls_back_to_cwd_when_no_config(tmp_path):
     paths_module = load_module("daedalus_workflows_code_review_paths_test", "workflows/code_review/paths.py")
     cwd = tmp_path / "scratch"
@@ -155,6 +215,13 @@ def test_project_key_for_workflow_root_reads_instance_name_from_workflow_yaml(tm
     paths_module = load_module("daedalus_workflows_code_review_paths_test", "workflows/code_review/paths.py")
     workflow_root = tmp_path / "workflow"
     _write_workflow_yaml(workflow_root, instance_name="Blueprint Engine")
+    assert paths_module.project_key_for_workflow_root(workflow_root) == "blueprint-engine"
+
+
+def test_project_key_for_workflow_root_reads_instance_name_from_workflow_markdown(tmp_path):
+    paths_module = load_module("daedalus_workflows_code_review_paths_test", "workflows/code_review/paths.py")
+    workflow_root = tmp_path / "workflow"
+    _write_workflow_markdown(workflow_root, instance_name="Blueprint Engine")
     assert paths_module.project_key_for_workflow_root(workflow_root) == "blueprint-engine"
 
 

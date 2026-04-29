@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from workflows.code_review.runtimes import _RUNTIME_KINDS, SessionHandle
+from workflows.code_review.runtimes import SessionHandle
 
 
 def test_acpx_runtime_has_run_command():
@@ -59,8 +59,10 @@ def test_claude_cli_run_command_invokes_run(tmp_path):
 
 def test_hermes_agent_runtime_registered():
     # Trigger registration
+    from workflows.code_review import runtimes as runtime_module
     from workflows.code_review.runtimes import hermes_agent  # noqa: F401
-    assert "hermes-agent" in _RUNTIME_KINDS
+
+    assert "hermes-agent" in runtime_module._RUNTIME_KINDS
 
 
 def test_hermes_agent_run_command(tmp_path):
@@ -258,6 +260,30 @@ def test_dispatch_agent_falls_back_to_bundled(tmp_path):
     p = resolve_prompt_template_path(workspace=ws, role="coder", agent_cfg={})
     assert p.name == "coder.md"
     assert "workflows/code_review/prompts" in str(p)
+
+
+def test_dispatch_agent_prefers_inline_prompt_template_from_config(tmp_path):
+    from workflows.code_review.dispatch import dispatch_agent
+
+    fake_run = MagicMock(return_value=MagicMock(stdout="ok"))
+    agents = {
+        "coder": {
+            "default": {"name": "c", "model": "gpt-5", "runtime": "codex-acpx"},
+        },
+    }
+    ws = _make_workspace(tmp_path, agents, _runtimes_cfg(), fake_run)
+    ws.config["prompts"] = {"coder": "Inline contract prompt"}
+
+    out = dispatch_agent(
+        workspace=ws, role="coder", tier="default",
+        prompt_kwargs={}, session_name="lane-9", worktree=tmp_path,
+    )
+
+    assert out == "ok"
+    argv = fake_run.call_args[0][0]
+    prompt_files = [a for a in argv if a.endswith(".txt")]
+    assert len(prompt_files) == 1
+    assert Path(prompt_files[0]).read_text() == "Inline contract prompt"
 
 
 def test_dispatch_agent_legacy_fallback_calls_run_prompt(tmp_path):

@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import yaml
 
 
 def test_load_workflow_returns_module_when_contract_is_complete(tmp_path, monkeypatch):
@@ -127,6 +128,22 @@ def _reset_workflows_module_cache():
             del sys.modules[mod]
 
 
+def _write_workflow_markdown(workspace_root: Path, *, workflow_name: str = "demo-wf", body: str = "Prompt body") -> None:
+    front_matter = {
+        "daedalus": {
+            "prompt-role": "coder",
+            "workflow-config": {
+                "workflow": workflow_name,
+                "schema-version": 1,
+            },
+        },
+    }
+    (workspace_root / "WORKFLOW.md").write_text(
+        "---\n" + yaml.safe_dump(front_matter, sort_keys=False) + "---\n\n" + body + "\n",
+        encoding="utf-8",
+    )
+
+
 def test_run_cli_dispatches_to_named_workflow_and_returns_its_exit_code(tmp_path, monkeypatch, capsys):
     _write_stub_workflow(tmp_path, name="demo-wf")
     workspace_root = tmp_path / "workspace"
@@ -143,6 +160,21 @@ def test_run_cli_dispatches_to_named_workflow_and_returns_its_exit_code(tmp_path
 
     assert code == 0
     assert "ran demo-wf with argv=['status', '--json']" in capsys.readouterr().out
+
+
+def test_run_cli_dispatches_when_workflow_contract_is_markdown(tmp_path, monkeypatch, capsys):
+    _write_stub_workflow(tmp_path, name="demo-wf")
+    workspace_root = tmp_path / "workspace"
+    workspace_root.mkdir()
+    _write_workflow_markdown(workspace_root, workflow_name="demo-wf", body="Markdown prompt body")
+    _reset_workflows_module_cache()
+    workflows = importlib.import_module("workflows")
+    monkeypatch.setattr(workflows, "__path__", list(workflows.__path__) + [str(tmp_path / "workflows")])
+
+    code = workflows.run_cli(workspace_root, ["status"])
+
+    assert code == 0
+    assert "ran demo-wf with argv=['status']" in capsys.readouterr().out
 
 
 def test_run_cli_raises_when_workflow_key_missing(tmp_path, monkeypatch):

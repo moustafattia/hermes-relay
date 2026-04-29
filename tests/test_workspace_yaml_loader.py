@@ -1,4 +1,4 @@
-"""Regression tests for YAML-only workflow workspace loading."""
+"""Regression tests for workflow contract workspace loading."""
 import importlib.util
 from pathlib import Path
 
@@ -83,6 +83,16 @@ def _yaml_config(repo_path: Path) -> dict:
     }
 
 
+def _workflow_markdown(config: dict, *, prompt_role: str = "coder", body: str = "Contract prompt") -> str:
+    front_matter = {
+        "daedalus": {
+            "prompt-role": prompt_role,
+            "workflow-config": config,
+        },
+    }
+    return "---\n" + yaml.safe_dump(front_matter, sort_keys=False) + "---\n\n" + body + "\n"
+
+
 def test_load_workspace_from_config_prefers_workflow_yaml(tmp_path):
     """When workflow.yaml exists, it must be read to build the workspace."""
     workspace = _load_workspace_module()
@@ -118,6 +128,20 @@ def test_load_workspace_from_config_accepts_explicit_yaml_path(tmp_path):
     assert ws.ENGINE_OWNER == "hermes"
 
 
+def test_load_workspace_from_config_accepts_explicit_markdown_path(tmp_path):
+    workspace = _load_workspace_module()
+    workspace_root = tmp_path / "workflow"
+    workspace_root.mkdir()
+    cfg = _yaml_config(tmp_path / "markdown-repo")
+    path = workspace_root / "WORKFLOW.md"
+    path.write_text(_workflow_markdown(cfg, prompt_role="internal-reviewer"), encoding="utf-8")
+
+    ws = workspace.load_workspace_from_config(workspace_root=workspace_root, config_path=path)
+
+    assert ws.REPO_PATH == Path(tmp_path / "markdown-repo")
+    assert ws.ENGINE_OWNER == "hermes"
+
+
 def test_load_workspace_from_config_rejects_json_config_path(tmp_path):
     workspace = _load_workspace_module()
     workspace_root = tmp_path / "workflow"
@@ -129,8 +153,21 @@ def test_load_workspace_from_config_rejects_json_config_path(tmp_path):
     with pytest.raises(ValueError):
         workspace.load_workspace_from_config(workspace_root=workspace_root, config_path=json_path)
 
+def test_load_workspace_from_config_falls_back_to_workflow_markdown(tmp_path):
+    workspace = _load_workspace_module()
+    workspace_root = tmp_path / "workflow"
+    workspace_root.mkdir()
+    cfg = _yaml_config(tmp_path / "markdown-repo")
+    (workspace_root / "WORKFLOW.md").write_text(_workflow_markdown(cfg), encoding="utf-8")
+
+    ws = workspace.load_workspace_from_config(workspace_root=workspace_root)
+
+    assert ws.REPO_PATH == Path(tmp_path / "markdown-repo")
+    assert ws.ENGINE_OWNER == "hermes"
+
+
 def test_load_workspace_from_config_raises_when_no_config_present(tmp_path):
-    """If workflow.yaml is missing, raise FileNotFoundError."""
+    """If no workflow contract is present, raise FileNotFoundError."""
     workspace = _load_workspace_module()
     workspace_root = tmp_path / "workflow"
     (workspace_root / "config").mkdir(parents=True)

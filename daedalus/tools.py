@@ -11,6 +11,7 @@ from contextlib import redirect_stderr
 from pathlib import Path
 from typing import Any
 
+from workflows.contract import WorkflowContractError, load_workflow_contract
 from workflows.code_review.paths import (
     derive_workflow_instance_name,
     plugin_runtime_path,
@@ -1261,14 +1262,13 @@ def cmd_get_observability(args, parser) -> str:
 
     workflow_root = Path(args.workflow_root).expanduser().resolve()
     workflow_name = args.workflow
-    config_yaml_path = workflow_root / "config" / "workflow.yaml"
     workflow_yaml = {}
-    if config_yaml_path.exists():
-        try:
-            import yaml as _yaml
-            workflow_yaml = _yaml.safe_load(config_yaml_path.read_text(encoding="utf-8")) or {}
-        except Exception as exc:
-            return f"error reading workflow.yaml: {exc}"
+    try:
+        workflow_yaml = load_workflow_contract(workflow_root).config
+    except FileNotFoundError:
+        workflow_yaml = {}
+    except (WorkflowContractError, OSError, UnicodeDecodeError) as exc:
+        return f"error reading workflow contract: {exc}"
 
     eff = resolve_effective_config(
         workflow_yaml=workflow_yaml,

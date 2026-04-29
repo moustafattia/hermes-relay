@@ -1,4 +1,5 @@
 import importlib.util
+import sys
 from pathlib import Path
 
 import yaml
@@ -74,3 +75,16 @@ def test_repo_root_tools_wrapper_dispatches_scaffold(tmp_path):
 
     assert "daedalus error:" not in out, out
     assert (workflow_root / "config" / "workflow.yaml").exists()
+
+
+def test_repo_root_workflows_wrapper_exposes_code_review_submodules():
+    for module_name in list(sys.modules):
+        if module_name == "workflows" or module_name.startswith("workflows."):
+            del sys.modules[module_name]
+
+    import importlib
+
+    runtimes = importlib.import_module("workflows.code_review.runtimes")
+
+    assert runtimes.__file__ is not None
+    assert "daedalus/workflows/code_review/runtimes" in runtimes.__file__

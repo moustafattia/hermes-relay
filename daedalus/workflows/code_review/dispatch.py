@@ -75,6 +75,33 @@ def resolve_prompt_template_path(
     return bundled
 
 
+def resolve_inline_prompt_template(
+    *,
+    workspace,
+    role: str,
+    agent_cfg: dict,
+) -> str | None:
+    """Return an inline prompt override from ``workspace.config.prompts``.
+
+    Explicit file paths still win. Inline prompts are the bridge used by the
+    ``WORKFLOW.md`` compatibility loader, which injects the Markdown body into
+    ``prompts.<role>``.
+    """
+    if agent_cfg.get("prompt"):
+        return None
+    prompts = (workspace.config or {}).get("prompts") or {}
+    if not prompts:
+        return None
+    template = prompts.get(role)
+    if template is None:
+        return None
+    if not isinstance(template, str):
+        raise DispatchConfigError(
+            f"workspace.config.prompts[{role!r}] must be a string"
+        )
+    return template
+
+
 def _materialize_prompt(*, worktree: Path, role: str, tier: str | None, rendered_text: str) -> Path:
     """Write the already-rendered prompt to a deterministic file under
     <worktree>/.daedalus/dispatch/, return the path."""
@@ -126,8 +153,9 @@ def dispatch_agent(
       - Resolves agent role (tiered for 'coder', flat otherwise).
       - Resolves runtime via ``workspace.runtime(<name>)``.
       - Resolves command (agent override -> runtime default -> None).
-      - Resolves prompt template path (agent.prompt -> workspace override ->
-        bundled), loads it, and renders via ``.format(**prompt_kwargs)``.
+      - Resolves prompt template text (agent.prompt file -> inline
+        ``workspace.config.prompts`` -> workspace override file -> bundled),
+        then renders via ``.format(**prompt_kwargs)``.
       - If a command is present: materializes the rendered text to a file,
         substitutes placeholders, invokes ``runtime.run_command(...)``.
       - If no command is present: invokes ``runtime.run_prompt(...)`` with the
@@ -144,10 +172,16 @@ def dispatch_agent(
 
     # Resolve + load + render the template (the dispatcher, not the caller,
     # owns this so workspace/agent overrides actually take effect).
-    template_path = resolve_prompt_template_path(
+    inline_template = resolve_inline_prompt_template(
         workspace=workspace, role=role, agent_cfg=cfg,
     )
-    template_text = template_path.read_text(encoding="utf-8")
+    if inline_template is not None:
+        template_text = inline_template
+    else:
+        template_path = resolve_prompt_template_path(
+            workspace=workspace, role=role, agent_cfg=cfg,
+        )
+        template_text = template_path.read_text(encoding="utf-8")
     rendered_text = template_text.format(**(prompt_kwargs or {}))
 
     command = _resolve_command(agent_cfg=cfg, runtime_cfg=runtime_cfg)

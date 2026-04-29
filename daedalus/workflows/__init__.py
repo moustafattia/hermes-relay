@@ -17,11 +17,8 @@ from pathlib import Path
 from types import ModuleType
 
 import jsonschema
-import yaml
 
-
-class WorkflowContractError(RuntimeError):
-    """Raised when a workflow package does not meet the required contract."""
+from .contract import WorkflowContractError, load_workflow_contract
 
 
 _REQUIRED_ATTRS = (
@@ -60,19 +57,16 @@ def run_cli(
     *,
     require_workflow: str | None = None,
 ) -> int:
-    """Read <workflow_root>/config/workflow.yaml, dispatch to the named workflow.
+    """Read the workflow contract under ``workflow_root`` and dispatch.
 
     When ``require_workflow`` is set, the dispatcher asserts that the YAML's
     ``workflow:`` field matches before dispatching. Used by the per-workflow
     direct form (``python3 -m workflows.code_review ...``) to pin the module
     regardless of what the YAML declares.
     """
-    config_path = workflow_root / "config" / "workflow.yaml"
-    cfg = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    if not isinstance(cfg, dict):
-        raise WorkflowContractError(
-            f"{config_path} must contain a YAML mapping at the top level"
-        )
+    contract = load_workflow_contract(workflow_root)
+    config_path = contract.source_path
+    cfg = contract.config
     workflow_name = cfg.get("workflow")
     if not workflow_name:
         raise WorkflowContractError(
@@ -85,6 +79,8 @@ def run_cli(
         )
 
     module = load_workflow(workflow_name)
+
+    import yaml
 
     schema = yaml.safe_load(module.CONFIG_SCHEMA_PATH.read_text(encoding="utf-8"))
     jsonschema.validate(cfg, schema)

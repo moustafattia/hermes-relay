@@ -5,8 +5,16 @@ import re
 from pathlib import Path
 from typing import Mapping
 
+from workflows.contract import (
+    DEFAULT_WORKFLOW_CONFIG_FILENAME,
+    DEFAULT_WORKFLOW_MARKDOWN_FILENAME,
+    find_workflow_contract_path,
+    load_workflow_contract,
+    workflow_markdown_path as _workflow_markdown_path,
+    workflow_yaml_path as _workflow_yaml_path,
+)
+
 DEFAULT_WORKFLOW_ROOT_ENV_VARS = ("DAEDALUS_WORKFLOW_ROOT",)
-DEFAULT_WORKFLOW_CONFIG_FILENAME = "config/workflow.yaml"
 
 _PROJECT_KEY_CHARS_RE = re.compile(r"[^a-z0-9._-]+")
 _PROJECT_KEY_SEPARATORS_RE = re.compile(r"[-._]{2,}")
@@ -40,27 +48,35 @@ def derive_workflow_instance_name(*, github_slug: str, workflow_name: str) -> st
 
 
 def workflow_config_path(workflow_root: Path) -> Path:
-    return workflow_root.resolve() / DEFAULT_WORKFLOW_CONFIG_FILENAME
+    return _workflow_yaml_path(workflow_root)
+
+
+def workflow_markdown_path(workflow_root: Path) -> Path:
+    return _workflow_markdown_path(workflow_root)
+
+
+def workflow_contract_path(workflow_root: Path) -> Path:
+    path = find_workflow_contract_path(workflow_root)
+    if path is None:
+        raise FileNotFoundError(
+            f"workflow contract not found under {Path(workflow_root).resolve()} "
+            f"(looked for {DEFAULT_WORKFLOW_CONFIG_FILENAME} and {DEFAULT_WORKFLOW_MARKDOWN_FILENAME})"
+        )
+    return path
 
 
 def load_workflow_config(workflow_root: Path) -> dict:
-    import yaml  # type: ignore[import]
-
-    path = workflow_config_path(workflow_root)
-    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise ValueError(f"{path} must contain a YAML mapping at the top level")
-    return payload
+    return load_workflow_contract(workflow_root).config
 
 
 def workflow_instance_name(workflow_root: Path) -> str:
     config = load_workflow_config(workflow_root)
     instance = config.get("instance")
     if not isinstance(instance, dict):
-        raise ValueError(f"{workflow_config_path(workflow_root)} is missing required instance config")
+        raise ValueError(f"{workflow_contract_path(workflow_root)} is missing required instance config")
     name = str(instance.get("name") or "").strip()
     if not name:
-        raise ValueError(f"{workflow_config_path(workflow_root)} is missing instance.name")
+        raise ValueError(f"{workflow_contract_path(workflow_root)} is missing instance.name")
     return name
 
 
@@ -70,6 +86,17 @@ def project_key_for_workflow_root(workflow_root: Path) -> str:
 
 def _has_project_runtime_layout(workflow_root: Path) -> bool:
     return any((workflow_root / name).exists() for name in ("runtime", "config", "workspace", "docs"))
+
+
+def _is_discoverable_markdown_workflow_root(workflow_root: Path) -> bool:
+    """Guard cwd auto-detection against repo-local ``WORKFLOW.md`` files.
+
+    Symphony's default contract is repo-owned, but Daedalus still uses a
+    workflow-instance root with mutable runtime/state directories. Only treat a
+    Markdown contract as a workflow-root marker during ancestor discovery when
+    the candidate also looks like a Daedalus instance root.
+    """
+    return any((workflow_root / name).exists() for name in ("runtime", "memory", "state"))
 
 
 def runtime_base_dir(workflow_root: Path) -> Path:
@@ -165,6 +192,8 @@ def _find_workflow_root(start: Path) -> Path | None:
     for candidate in (path, *path.parents):
         if workflow_config_path(candidate).exists():
             return candidate
+        if workflow_markdown_path(candidate).exists() and _is_discoverable_markdown_workflow_root(candidate):
+            return candidate
     return None
 
 
@@ -190,5 +219,7 @@ def resolve_default_workflow_root(
     plugin_dir = plugin_root_path(plugin_dir=plugin_dir)
     repo_parent = plugin_dir.parent.resolve()
     if workflow_config_path(repo_parent).exists():
+        return repo_parent
+    if workflow_markdown_path(repo_parent).exists() and _is_discoverable_markdown_workflow_root(repo_parent):
         return repo_parent
     return cwd_path

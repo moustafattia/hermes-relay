@@ -162,12 +162,14 @@ Two factories are provided:
   ``orchestrator``, etc.) looks up workspace attributes by name, so any
   duck-typed accessor works.
 * :func:`load_workspace_from_config` — convenience wrapper that reads the
-  project workflow config from ``config/workflow.yaml`` and applies the same
-  derived constants the workspace uses internally.
+  project workflow contract from either ``config/workflow.yaml`` or
+  ``WORKFLOW.md`` and applies the same derived constants the workspace uses
+  internally.
 """
 
 
 DEFAULT_YAML_CONFIG_FILENAME = "config/workflow.yaml"
+DEFAULT_WORKFLOW_MARKDOWN_FILENAME = "WORKFLOW.md"
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -2093,16 +2095,17 @@ def load_workspace_from_config(
     workspace_root: Path,
     config_path: Path | None = None,
 ) -> SimpleNamespace:
-    """Convenience factory: read ``config/workflow.yaml`` and build a workspace."""
+    """Convenience factory: read the workflow contract and build a workspace."""
+    from workflows.contract import load_workflow_contract, load_workflow_contract_file
+
     workspace_root = Path(workspace_root)
     if config_path is not None:
         path = Path(config_path)
-        if path.suffix.lower() not in {".yaml", ".yml"}:
-            raise ValueError(f"workflow config must be YAML: {path}")
-        config = _load_yaml(path)
+        if path.suffix.lower() not in {".yaml", ".yml", ".md"}:
+            raise ValueError(f"workflow config must be YAML or WORKFLOW.md: {path}")
+        config = load_workflow_contract_file(path).config
         return make_workspace(workspace_root=workspace_root, config=config)
 
-    yaml_path = workspace_root / DEFAULT_YAML_CONFIG_FILENAME
     return make_workspace(
-        workspace_root=workspace_root, config=_load_yaml(yaml_path)
+        workspace_root=workspace_root, config=load_workflow_contract(workspace_root).config
     )
